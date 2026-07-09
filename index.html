@@ -1,0 +1,2388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0b0d" />
+<title>명탐정 도구리</title>
+<style>
+  :root {
+    --doguri: #f79f92;
+    --mung: #e2a559;
+    --panel: rgba(0, 0, 0, 0.72);
+    --line: #6f6f6f;
+    --ui: rgba(255, 255, 255, 0.96);
+    --uiText: #151515;
+    --radius: 24px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; }
+  body {
+    font-family: Arial, "Noto Sans KR", sans-serif;
+    color: #fff;
+    user-select: none;
+    touch-action: none;
+    cursor: url("images/cursor_default.png") 64 64, auto;
+  }
+  #app, #app * {
+    cursor: url("images/cursor_default.png") 64 64, auto;
+  }
+  #sceneViewport.cursor-investigate,
+  #sceneViewport.cursor-investigate * {
+    cursor: url("images/cursor_investigate.png") 64 64, auto;
+  }
+  #sceneViewport.cursor-drag,
+  #sceneViewport.cursor-drag * {
+    cursor: url("images/cursor_drag.png") 64 64, auto;
+  }
+  button, input { font: inherit; }
+  button {
+    border: 0;
+    outline: 0;
+  }
+  button, .pressable {
+    transform: scale(1);
+    transition: transform 120ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    button:hover, .pressable:hover { transform: scale(1.055); }
+  }
+  button:active, .pressable:active { transform: scale(0.94); }
+
+  #app {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: #000;
+  }
+  #app.noir { filter: grayscale(1); }
+
+  .hidden { display: none !important; }
+  .serif { font-family: Georgia, "Times New Roman", "Noto Serif KR", serif; }
+
+  /* Shared scene */
+  #sceneViewport {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: #000;
+    z-index: 1;
+  }
+  .scene-pan-arrow {
+    position: absolute;
+    z-index: 18;
+    width: clamp(52px, 6vw, 96px);
+    height: clamp(52px, 6vw, 96px);
+    object-fit: contain;
+    pointer-events: none;
+    opacity: .92;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,.55));
+  }
+  #panArrowW { left: max(10px, env(safe-area-inset-left)); top: 50%; transform: translateY(-50%); }
+  #panArrowE { right: max(10px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); }
+  #panArrowN { top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); }
+  #panArrowS { bottom: max(10px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); }
+  #sceneInner {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+  #sceneBg, #windowClosed {
+    position: absolute;
+    display: block;
+    pointer-events: none;
+  }
+  #sceneBg {
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    object-fit: cover;
+    object-position: center top;
+  }
+  #windowClosed {
+    left: 848px;
+    top: 10px;
+    width: 512px;
+    height: 512px;
+    object-fit: contain;
+    z-index: 3;
+  }
+  #hotspotLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+  }
+  .hotspot {
+    position: absolute;
+    background: transparent;
+    border: 0;
+    padding: 0;
+  }
+  .hotspot.debug { outline: 2px solid rgba(255, 0, 0, .5); background: rgba(255, 0, 0, .08); }
+
+  #birdSprite {
+    position: absolute;
+    left: 1138px;
+    top: 306px;
+    width: 100px;
+    height: 100px;
+    background-image: url("images/bird.png");
+    background-repeat: no-repeat;
+    background-size: 400% 400%;
+    z-index: 8;
+    opacity: 0;
+    transform: translate(-40px, -40px) scale(0);
+    transform-origin: 50% 90%;
+    pointer-events: none;
+  }
+  #birdSprite.active { pointer-events: auto; }
+
+  .found-circle {
+    position: absolute;
+    width: 128px;
+    height: 128px;
+    margin-left: -64px;
+    margin-top: -64px;
+    background: url("images/foundcircle.png") center/contain no-repeat;
+    z-index: 15;
+    pointer-events: none;
+    animation: foundPulse 3s both;
+  }
+  @keyframes foundPulse {
+    0% { opacity: 0; transform: scale(.55); }
+    10% { opacity: 1; transform: scale(1.12); }
+    18% { transform: scale(1); }
+    82% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(.7); }
+  }
+
+  /* Initial */
+  #initialScreen {
+    position: absolute;
+    inset: 0;
+    z-index: 110;
+    background: #000;
+  }
+  #versionLabel {
+    position: absolute;
+    right: max(16px, calc(env(safe-area-inset-right) + 8px));
+    bottom: max(14px, calc(env(safe-area-inset-bottom) + 8px));
+    z-index: 2;
+    color: #fff;
+    font-size: clamp(14px, 1.3vw, 20px);
+    font-weight: 700;
+    letter-spacing: .04em;
+    pointer-events: none;
+  }
+  #newGameConfirmDim {
+    position: absolute;
+    inset: 0;
+    z-index: 120;
+    background: rgba(0,0,0,.58);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+  #newGameConfirmPopup {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 121;
+    transform: translate(-50%, -50%);
+    width: min(94vw, 680px);
+    padding: 26px;
+    border-radius: 22px;
+    background: rgba(0,0,0,.78);
+    text-align: center;
+  }
+  #newGameConfirmPopup p {
+    margin: 0;
+    font-size: clamp(14px, 2vw, 28px);
+    line-height: 1.55;
+    white-space: nowrap;
+  }
+  #newGameConfirmPopup .popup-actions { margin-top: 22px; }
+
+  /* Start */
+  #startScreen {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    overflow: hidden;
+    background: #000;
+  }
+  #startBg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+  }
+  #startTitle {
+    position: absolute;
+    width: min(56vw, 760px);
+    max-height: 34vh;
+    object-fit: contain;
+    left: 50%;
+    top: 3vh;
+    transform: translateX(-50%);
+    z-index: 2;
+  }
+  #startDoguri {
+    position: absolute;
+    width: 82vh;
+    height: 82vh;
+    object-fit: contain;
+    left: 50%;
+    top: 66%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+  }
+  #startPrompt {
+    position: absolute;
+    left: 50%;
+    bottom: max(8vh, calc(env(safe-area-inset-bottom) + 16px));
+    transform: translateX(-50%);
+    z-index: 3;
+    isolation: isolate;
+    font-size: clamp(20px, 2.5vw, 36px);
+    font-weight: 400;
+    letter-spacing: .04em;
+    text-shadow: 0 2px 12px rgba(0,0,0,.8);
+    animation: blink 2.4s cubic-bezier(.445, .05, .55, .95) infinite;
+    white-space: nowrap;
+  }
+  #startPrompt::before {
+    content: "";
+    position: absolute;
+    inset: -14px -28px;
+    z-index: -1;
+    border-radius: 50%;
+    background: rgba(0,0,0,.10);
+    filter: blur(14px);
+    pointer-events: none;
+  }
+  @keyframes blink { 0%,100% { opacity: .25; } 50% { opacity: 1; } }
+
+  #startActions {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    width: min(78vw, 360px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .start-action-btn {
+    width: 100%;
+    min-height: 58px;
+    padding: 13px 24px;
+    border-radius: 18px;
+    background: #fff;
+    color: #000;
+    font-size: clamp(18px, 2vw, 27px);
+    font-weight: 800;
+  }
+
+  /* Intro */
+  #introScreen {
+    position: absolute;
+    inset: 0;
+    z-index: 95;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8vw;
+    text-align: center;
+  }
+  #introText {
+    max-width: 1100px;
+    font-size: clamp(24px, 3.2vw, 54px);
+    line-height: 1.65;
+    opacity: 0;
+    transition: opacity .6s ease;
+  }
+  #introText.show { opacity: 1; }
+
+  /* Main UI */
+  #mainUi {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+  }
+  #bottomBar {
+    position: absolute;
+    left: 50%;
+    bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px));
+    transform: translateX(-50%);
+    display: flex;
+    gap: clamp(14px, 2.3vw, 34px);
+    pointer-events: auto;
+  }
+  .icon-wrap { position: relative; }
+  .update-badge {
+    position: absolute;
+    top: -14px;
+    right: -4px;
+    z-index: 4;
+    width: clamp(36px, 4vw, 64px);
+    height: clamp(36px, 4vw, 64px);
+    object-fit: contain;
+    pointer-events: none;
+  }
+  .icon-btn {
+    position: relative;
+    width: clamp(68px, 7vw, 106px);
+    height: clamp(68px, 7vw, 106px);
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    overflow: visible;
+  }
+  .icon-btn > img:not(.update-badge) { width: 100%; height: 100%; object-fit: contain; }
+  .tooltip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 14px);
+    transform: translateX(-50%) translateY(6px);
+    padding: 9px 14px;
+    border-radius: 14px;
+    background: #000;
+    color: #fff;
+    font-weight: 700;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: .15s ease;
+  }
+  .tooltip::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 9px solid #000;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .icon-wrap:hover .tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  #settingsButton {
+    position: absolute;
+    right: max(16px, env(safe-area-inset-right));
+    top: max(16px, env(safe-area-inset-top));
+    pointer-events: auto;
+  }
+  #backButton {
+    position: absolute;
+    left: max(16px, env(safe-area-inset-left));
+    top: max(16px, env(safe-area-inset-top));
+    z-index: 52;
+    pointer-events: auto;
+  }
+
+  /* Dialogue */
+  #characterLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 35;
+    pointer-events: none;
+  }
+  .character {
+    position: absolute;
+    bottom: 30;
+    width: min(82vh, 920px);
+    height: min(98vh, 1080px);
+    object-fit: contain;
+    object-position: center bottom;
+    transition: opacity .18s ease;
+  }
+  #mungCenter { left: 50%; transform: translateX(-50%); }
+  #doguriLeft { left: max(-2vw); height: min(80vh, 1000px); bottom: 40px;}
+  #mungRight { right: max(-4vw); height: min(100vh, 1000px); bottom: 5px;}
+
+  #dialogueBlocker {
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    background: transparent;
+  }
+  #dialogueBox {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -6px;
+    min-height: calc(clamp(150px, 23vh, 250px) + clamp(22px, 3vh, 40px) + 24px);
+    z-index: 65;
+    background: var(--panel);
+    border-top: 2px solid var(--line);
+    padding: 22px clamp(24px, 5vw, 90px) max(28px, calc(env(safe-area-inset-bottom) + 22px));
+  }
+  #speakerName {
+    font-size: clamp(28px, 3vw, 46px);
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+  #speakerName.doguri { color: var(--doguri); }
+  #speakerName.mung { color: var(--mung); }
+  #dialogueText {
+    font-size: clamp(22px, 2.4vw, 38px);
+    line-height: 1.5;
+    min-height: 1.5em;
+    color: #fff;
+  }
+  #nextMark {
+    position: absolute;
+    right: clamp(18px, 5vw, 90px);
+    bottom: max(26px, calc(env(safe-area-inset-bottom) + 22px));
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
+    pointer-events: none;
+    animation: bob .9s ease-in-out infinite;
+  }
+  @keyframes bob { 0%,100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
+
+  /* Dim, popup, choices */
+  #dim {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    background: rgba(0,0,0,.58);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+  .popup {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 50;
+    transform: translate(-50%, -50%);
+    width: min(88vw, 640px);
+    max-height: 88vh;
+    overflow: auto;
+    background: rgba(0,0,0,.72);
+    border-radius: var(--radius);
+    padding: clamp(22px, 3.2vw, 42px);
+  }
+  .popup h2 {
+    margin: 0 0 20px;
+    font-size: clamp(26px, 3vw, 42px);
+    text-align: center;
+  }
+  .popup p {
+    margin: 12px 0;
+    font-size: clamp(18px, 2vw, 28px);
+    line-height: 1.55;
+    text-align: center;
+  }
+  .choice-stack, .popup-actions {
+    display: flex;
+    gap: 14px;
+  }
+  .choice-stack { flex-direction: column; }
+  .popup-actions {
+    justify-content: center;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .choice-btn, .action-btn {
+    min-height: 56px;
+    padding: 13px 26px;
+    border-radius: 18px;
+    background: var(--ui);
+    color: var(--uiText);
+    font-weight: 800;
+    font-size: clamp(18px, 2vw, 27px);
+  }
+  .choice-btn { width: 100%; }
+  #cluePresentButton:disabled {
+    opacity: .35;
+    pointer-events: none;
+    transform: none;
+  }
+
+  /* Toast */
+  #toast {
+    position: absolute;
+    left: 50%;
+    top: max(7vh, calc(env(safe-area-inset-top) + 22px));
+    z-index: 90;
+    transform: translateX(-50%) scale(.88);
+    max-width: min(90vw, 820px);
+    padding: 14px 24px;
+    border-radius: 18px;
+    background: rgba(255,255,255,.96);
+    color: #111;
+    font-size: clamp(18px, 2vw, 28px);
+    font-weight: 800;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transform-origin: center center;
+    transition: opacity .18s cubic-bezier(.445, .05, .55, .95),
+                transform .18s cubic-bezier(.445, .05, .55, .95);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
+
+  /* Clue popup */
+  #cluePopup {
+    width: min(80vw, 1600px, calc((94vh - 118px) * 1.25));
+    max-height: 94vh;
+    overflow: hidden;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+  }
+  #clueGrid {
+    display: grid;
+    justify-content: center;
+    gap: 0;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .clue-cell {
+    margin: 0px;
+    position: relative;
+    width: 94%;
+    justify-self: center;
+    aspect-ratio: 1;
+    border-radius: 0;
+    background: transparent;
+    overflow: hidden;
+    padding: 0;
+  }
+  @media (orientation: portrait) {
+    #clueGrid { grid-template-columns: repeat(5, 20%); }
+    .clue-cell:nth-child(5n + 1) { left: 18%; }
+    .clue-cell:nth-child(5n + 2) { left: 9%; }
+    .clue-cell:nth-child(5n + 3) { left: 0; }
+    .clue-cell:nth-child(5n + 4) { left: -9%; }
+    .clue-cell:nth-child(5n + 5) { left: -18%; }
+  }
+  @media (orientation: landscape) {
+    #cluePopup {
+      width: min(92vw, 1100px, calc((94vh - 118px) * 2.5));
+    }
+    #clueGrid { grid-template-columns: repeat(10, 10%); }
+    .clue-cell:nth-child(10n + 1) { left: 90%; }
+    .clue-cell:nth-child(10n + 2) { left: 70%; }
+    .clue-cell:nth-child(10n + 3) { left: 50%; }
+    .clue-cell:nth-child(10n + 4) { left: 30%; }
+    .clue-cell:nth-child(10n + 5) { left: 10%; }
+    .clue-cell:nth-child(10n + 6) { left: -10%; }
+    .clue-cell:nth-child(10n + 7) { left: -30%; }
+    .clue-cell:nth-child(10n + 8) { left: -50%; }
+    .clue-cell:nth-child(10n + 9) { left: -70%; }
+    .clue-cell:nth-child(10n + 10) { left: -90%; }
+  }
+  .clue-sprite, .clue-frame {
+    position: absolute;
+    inset: -7px -11px;
+    background-repeat: no-repeat;
+    background-size: 500% 500%;
+  }
+  .clue-frame {
+    display: none;
+    background-image: url("images/clues_on.png");
+    background-position: 0% 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .clue-cell.selected .clue-frame { display: block; }
+  #clueKeywords {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    width: 90%;
+    margin: 18px auto 0;
+    padding: 0 10px;
+    min-height: 36px;
+    font-size: clamp(13px, 1.4vw, 18px);
+    line-height: 1.4;
+    text-align: center;
+  }
+  .clue-keyword-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+    padding: 7px 12px;
+    border-radius: 10px;
+    background: rgba(0,0,0,.55);
+    color: #fff;
+    white-space: nowrap;
+  }
+  #cluePopup .popup-actions { margin-top: 32px; }
+  #cluePopup .action-btn { min-height: 48px; padding: 10px 22px; }
+
+  /* Settings popup: buttons only */
+  #settingsPopup {
+    width: min(88vw, 420px);
+    max-height: none;
+    overflow: visible;
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+  }
+  #settingsPopup h2 { display: none; }
+  #settingsPopup .choice-stack {
+    width: 100%;
+  }
+
+  /* Choice popup: buttons only */
+  #choicePopup {
+    width: min(88vw, 520px);
+    max-height: none;
+    overflow: visible;
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  /* Reasoning */
+  #reasoningPopup {
+    width: min(92vw, 980px);
+    max-height: 92vh;
+    overflow: visible;
+    background: transparent;
+    border-radius: 0;
+  }
+  #reasoningText {
+    font-size: clamp(17px, 1.7vw, 25px);
+    line-height: 2.15;
+    text-align: left;
+    word-break: keep-all;
+  }
+  .blank-slot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 76px;
+    height: 42px;
+    margin: 0 3px;
+    padding: 0 5px;
+    border: 0;
+    border-bottom: 2px solid rgba(255,255,255,.9);
+    color: #fff;
+    background: transparent;
+    border-radius: 0;
+    vertical-align: middle;
+    font-weight: 800;
+  }
+  #keywordBank {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 22px;
+    padding: 16px;
+    overflow: visible;
+    border-radius: 18px;
+    background: transparent;
+  }
+  .keyword-chip {
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: #000;
+    color: #fff;
+    font-weight: 800;
+    font-size: 17px;
+  }
+  #reasoningConfirm:disabled {
+    opacity: .35;
+    pointer-events: none;
+    transform: scale(1);
+  }
+  .keyword-chip.selected { outline: 4px solid rgba(255,255,255,.45); transform: scale(1.06); }
+  .keyword-drag-preview {
+    position: fixed;
+    left: -9999px;
+    top: -9999px;
+    display: inline-flex;
+    padding: 12px;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  /* Clear popup */
+  #clearStats {
+    display: grid;
+    gap: 12px;
+    padding: 18px;
+    background: rgba(255,255,255,.08);
+    border-radius: 18px;
+    margin-top: 18px;
+  }
+  .stat-row { display: flex; justify-content: space-between; gap: 20px; font-size: clamp(20px,2vw,28px); }
+
+
+  /* Fade */
+  #fade {
+    position: absolute;
+    inset: 0;
+    z-index: 200;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .65s ease;
+  }
+  #fade.on { opacity: 1; pointer-events: auto; }
+
+  /* Mobile */
+  @media (max-width: 700px) {
+    #startTitle { width: 78vw; top: 5vh; }
+    #startPrompt { font-size: 24px; bottom: max(8vh, calc(env(safe-area-inset-bottom) + 12px)); }
+    .popup { width: 88vw; padding: 20px; border-radius: 20px; }
+    #clueGrid { gap: 0; }
+    .clue-cell { border-radius: 0; }
+    #dialogueBox { min-height: calc(180px + clamp(22px, 3vh, 40px) + 24px); padding-left: 22px; padding-right: 22px; }
+    .character { width: 88vw; height: 78vh; }
+    #mungCenter { bottom: -20px; }
+    #doguriLeft { left: -12vw; bottom: 90px; }
+    #mungRight { right: -14vw; bottom: 70px; }
+    #bottomBar { gap: 12px; }
+    .icon-btn { width: 70px; height: 70px; }
+    .blank-slot { min-width: 62px; height: 38px; padding: 0 4px; }
+    #reasoningText { line-height: 2.3; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sceneViewport" class="hidden">
+    <div id="sceneInner">
+      <img id="sceneBg" src="images/bg_lodge.png" alt="" draggable="false" />
+      <img id="windowClosed" src="images/bg_window_closed.png" alt="" draggable="false" />
+      <div id="birdSprite" aria-hidden="true"></div>
+      <div id="hotspotLayer"></div>
+    </div>
+    <img id="panArrowW" class="scene-pan-arrow hidden" src="images/arrow_w.png" alt="" draggable="false" />
+    <img id="panArrowE" class="scene-pan-arrow hidden" src="images/arrow_e.png" alt="" draggable="false" />
+    <img id="panArrowN" class="scene-pan-arrow hidden" src="images/arrow_n.png" alt="" draggable="false" />
+    <img id="panArrowS" class="scene-pan-arrow hidden" src="images/arrow_s.png" alt="" draggable="false" />
+  </div>
+
+  <div id="initialScreen">
+    <div id="startActions">
+      <button id="startPrimaryButton" class="start-action-btn">시작하기</button>
+      <button id="startNewButton" class="start-action-btn">처음부터</button>
+    </div>
+    <div id="versionLabel">v0.1</div>
+  </div>
+
+  <div id="newGameConfirmDim" class="hidden"></div>
+  <div id="newGameConfirmPopup" class="hidden">
+    <p>진행 상황을 초기화하고 처음부터 시작할까요?</p>
+    <div class="popup-actions">
+      <button id="newGameCancelButton" class="action-btn">취소</button>
+      <button id="newGameConfirmButton" class="action-btn">확인</button>
+    </div>
+  </div>
+
+  <div id="startScreen" class="hidden">
+    <img id="startBg" src="images/bg_title.png" alt="" draggable="false" />
+    <img id="startTitle" src="images/title.png" alt="명탐정 도구리" draggable="false" />
+    <img id="startDoguri" src="images/doguri_title.png" alt="" draggable="false" />
+    <div id="startPrompt" class="serif">화면을 눌러 게임을 시작하세요.</div>
+  </div>
+
+  <div id="introScreen" class="hidden">
+    <div id="introText" class="serif"></div>
+  </div>
+
+  <div id="mainUi" class="hidden">
+    <div id="bottomBar">
+      <div class="icon-wrap hidden">
+        <button id="investigateButton" class="icon-btn" aria-label="조사하기"><img src="images/icon_investigate.png" alt="" /></button>
+        <div class="tooltip">조사하기</div>
+      </div>
+      <div class="icon-wrap">
+        <button id="noteButton" class="icon-btn" aria-label="수첩보기">
+          <img src="images/icon_note.png" alt="" />
+          <img id="noteBadge" class="update-badge hidden" src="images/badge.png" alt="" draggable="false" />
+        </button>
+        <div class="tooltip">수첩보기</div>
+      </div>
+      <div class="icon-wrap">
+        <button id="chatButton" class="icon-btn" aria-label="추리하기">
+          <img src="images/icon_chat.png" alt="" />
+          <img id="chatBadge" class="update-badge hidden" src="images/badge.png" alt="" draggable="false" />
+        </button>
+        <div class="tooltip">추리하기</div>
+      </div>
+    </div>
+
+    <div id="settingsButton" class="icon-wrap">
+      <button class="icon-btn" aria-label="설정"><img src="images/icon_setup.png" alt="" /></button>
+    </div>
+
+    <div id="backButton" class="icon-wrap hidden">
+      <button class="icon-btn" aria-label="뒤로가기"><img src="images/icon_back.png" alt="" /></button>
+    </div>
+  </div>
+
+  <div id="characterLayer" class="hidden">
+    <img id="mungCenter" class="character hidden" src="images/mung_center.png" alt="" draggable="false" />
+    <img id="doguriLeft" class="character hidden" src="images/doguri_left.png" alt="" draggable="false" />
+    <img id="mungRight" class="character hidden" src="images/mung_right.png" alt="" draggable="false" />
+  </div>
+
+  <div id="dim" class="hidden"></div>
+
+  <div id="dialogueBlocker" class="hidden"></div>
+  <div id="dialogueBox" class="hidden">
+    <div id="speakerName"></div>
+    <div id="dialogueText"></div>
+    <img id="nextMark" class="hidden" src="images/next.png" alt="다음 대사" draggable="false" />
+  </div>
+
+  <div id="choicePopup" class="popup hidden">
+    <div id="choiceStack" class="choice-stack"></div>
+  </div>
+
+  <div id="cluePopup" class="popup hidden">
+    <div id="clueGrid"></div>
+    <div id="clueKeywords"></div>
+    <div class="popup-actions">
+      <button id="clueCancelButton" class="action-btn hidden">취소</button>
+      <button id="cluePresentButton" class="action-btn hidden">제시한다</button>
+      <button id="clueConfirmButton" class="action-btn">확인</button>
+    </div>
+  </div>
+
+  <div id="reasoningPopup" class="popup hidden">
+    <div id="reasoningText"></div>
+    <div id="keywordBank"></div>
+    <div class="popup-actions">
+      <button id="reasoningCancel" class="action-btn">취소</button>
+      <button id="reasoningConfirm" class="action-btn">확인</button>
+    </div>
+  </div>
+
+  <div id="settingsPopup" class="popup hidden">
+    <h2>설정</h2>
+    <p id="roundInfo" class="hidden"></p>
+    <div class="choice-stack">
+      <button id="hintButton" class="choice-btn">힌트 보기</button>
+      <button id="titleButton" class="choice-btn">시작 화면으로 돌아가기</button>
+      <button id="noirButton" class="choice-btn hidden">누아르 모드 OFF</button>
+    </div>
+  </div>
+
+  <div id="messagePopup" class="popup hidden">
+    <p id="messageText"></p>
+    <div id="messageActions" class="popup-actions"></div>
+  </div>
+
+  <div id="clearPopup" class="popup hidden">
+    <h2>사건 해결</h2>
+    <div id="clearStats"></div>
+    <div class="popup-actions">
+      <button id="clearConfirm" class="action-btn">확인</button>
+    </div>
+  </div>
+
+
+  <div id="toast"></div>
+  <div id="fade"></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const SAVE_KEY = "detectiveDoguriSave_v1";
+
+  const clueData = [
+    { name:"고드름", keywords:["고드름"], lines:["이 정도면 고드름이 아니라 얼음 창인데…"], rect:[1127,72,1320,187], special:"icicle" },
+    { name:"그림 액자", keywords:["사인"], lines:["멋진 그림이네… 친필 사인까지 있어."], rect:[427,21,607,209] },
+    { name:"깨진 꽃병", keywords:["깨진 꽃병","연출"], lines:["극적인 연출이네…"], rect:[1242,693,1431,867] },
+    { name:"다잉 메시지", keywords:["사고사"], lines:["사고사는 너무 친절한 마지막 말인데…"], rect:[295,647,517,740] },
+    { name:"목재", keywords:["목재"], lines:["짤막한 나뭇가지. 이파리는 마지막 남은 자존심인가."], rect:[1053,556,1127,638] },
+    { name:"문고리", keywords:["방문"], lines:["발견 당시 잠겨 있던 방문이다.","잠금 장치를 누른 채 닫으면, 밖에서는 열리지 않는 구조네."], rect:[1621,729,1821,1053] },
+    { name:"물", keywords:["물"], lines:["상처 주변이 젖어 있어. 피가 아니라… 물?"], rect:[608,749,840,948] },
+    { name:"바나나", keywords:["바나나"], lines:["이상한데..."], rect:[1093,911,1334,1074] },
+    { name:"발자국", keywords:["책상","발자국"], lines:["책상 위에 발자국…?"], rect:[1052,399,1359,464] },
+    { name:"석재", keywords:["석재"], lines:["조그만 돌멩이. 물에 젖으면 반질반질 빛날 것 같다."], rect:[68,658,151,737] },
+    { name:"술병", keywords:["술"], lines:["왜 이것만 멀쩡히 서 있지?"], rect:[468,772,593,1062] },
+    { name:"시계", keywords:["시계"], lines:["상당히 무겁네… 잠깐, 안에서 시계 소리가 나."], rect:[417,218,516,351] },
+    { name:"열쇠", keywords:["열쇠"], lines:["아직 온기가 남아 있다.","엇, 잠깐… 안에 열쇠가 있어."], rect:[112,524,195,603], special:"key" },
+    { name:"오목눈이", keywords:["오목눈이"], lines:["앗, 귀여운 오목눈이다.","나보다 침착하네…"], rect:[1138,304,1224,390], special:"bird" },
+    { name:"옷걸이", keywords:["사건"], lines:["이 사건도 걸리는 게 많아."], rect:[1581,81,1768,689] },
+    { name:"원단", keywords:["원단"], lines:["작은 천 조각. 누군가의 옷에서 찢겨 나온 것 같아."], rect:[1453,562,1552,634] },
+    { name:"자상", keywords:["자상"], lines:["베인 상처라기보다는…","뭔가에 깊이 찔린 상처 같아."], rect:[750,585,894,719] },
+    { name:"창문", keywords:["창문"], lines:["창문은 안쪽에서 잠겨 있다.","열쇠 구멍이 있지만 열쇠는 보이지 않는다."], rect:[855,47,1543,390], special:"window" },
+    { name:"책", keywords:["청소"], lines:["《매일 10분 정리 습관》, 《먼지 없는 생활》, 《깔끔한 방의 조건》…","청소에 꽤 진심인 분이었나 보다."], rect:[405,363,636,577] },
+    { name:"혹", keywords:["혹"], lines:["혹은 크지만… 이게 정말 치명상이었을까?"], rect:[653,449,746,537] }
+  ];
+
+  const rebuttals = [
+    {
+      claim:["피해자는 술에 취해 넘어졌습니다.","제가 잘 압니다."],
+      correct:[10,7,18],
+      response:(idx) => idx === 10 ? [
+        {speaker:"도구리", text:"그런데 넘어졌다면 술병도 쓰러졌어야 하지 않을까요?"},
+        {speaker:"멍반장", text:"술병은 중심을 잘 잡았군요."}
+      ] : [
+        {speaker:"도구리", text:"누군가 바나나 껍질을 일부러 놓은 것 같아요."},
+        {speaker:"도구리", text:"피해자의 깔끔한 성격과 맞지 않거든요."},
+        {speaker:"멍반장", text:"깔끔하게 미끄러졌군요."}
+      ]
+    },
+    {
+      claim:["어쨌든 머리에 혹이 있습니다.","머리를 부딪힌 겁니다."],
+      correct:[16],
+      response:() => [
+        {speaker:"도구리", text:"진짜 이상한 건 머리가 아니라 몸의 상처예요."},
+        {speaker:"멍반장", text:"아… 혹이 아니었군요."}
+      ]
+    },
+    {
+      claim:["그럼 깨진 꽃병 조각에 찔린 겁니다."],
+      correct:[2,16],
+      response:() => [
+        {speaker:"도구리", text:"이 상처는 좁고 깊어서 꽃병으로 낼 수 있는 상처가 아닌 것 같아요."},
+        {speaker:"멍반장", text:"...!"}
+      ]
+    },
+    {
+      claim:["하지만 방 안에 흉기가 없습니다."],
+      correct:[0,6],
+      response:() => [
+        {speaker:"도구리", text:"흉기가 사라진 게 아니라, 녹은 거라면요?"},
+        {speaker:"멍반장", text:"녹는 흉기요? 아이스크림 말입니까?"}
+      ]
+    },
+    {
+      claim:["하지만 저 고드름, 너무 높이 달려 있지 않나요?"],
+      correct:[8],
+      response:() => [
+        {speaker:"도구리", text:"책상 위에 발자국이 남아 있었어요."},
+        {speaker:"도구리", text:"누군가 올라갔다는 뜻이에요."},
+        {speaker:"멍반장", text:"방에서 신발을 벗지 않다니… 서양식이군요."}
+      ]
+    }
+  ];
+
+  const finalAnswers = ["피해자","술","혹","깨진 꽃병","사고사","연출","사인","자상","범인","책상","고드름","피해자","창문","열쇠","방문"];
+  const finalAcceptedAnswers = finalAnswers.map(word => [word]);
+  finalAcceptedAnswers[1] = ["술", "바나나"];
+  finalAcceptedAnswers[3] = ["깨진 꽃병", "술"];
+  const finalTemplate = [
+    ["","는 "," 때문에 넘어진 것이 아니다."],
+    ["머리의 ","과 ","은 ","처럼 보이게 하려는 ","이다."],
+    ["진짜 ","은 몸에 난 깊고 좁은 ","."],
+    ["","은 흉기를 남기지 않기 위해 "," 위에 올라가, 창밖 처마의 ","을 꺾어 ","를 찔렀다."],
+    ["그리고 ","을 잠근 뒤, ","를 숨겼다."],
+    ["창밖의 눈에 발자국을 남기지 않기 위해, 잠금 장치를 누른 뒤 ","으로 나갔다."]
+  ];
+  const finalSlotMap = [
+    [0,1], [2,3,4,5], [6,7], [8,9,10,11], [12,13], [14]
+  ];
+
+  const defaultState = () => ({
+    version: 1,
+    runActive: false,
+    completed: false,
+    clues: Array(20).fill(false),
+    keywords: ["피해자","범인"],
+    rebuttalStage: 0,
+    windowOpen: false,
+    elapsedMs: 0,
+    finalTimeMs: 0,
+    noirUnlocked: false,
+    noirOn: false,
+    round: 1,
+    pendingNewRound: false,
+    noteUpdated: false,
+    chatUpdated: false,
+    reasoningDraft: Array(finalAnswers.length).fill("")
+  });
+
+  let state = loadState();
+  let currentMode = "title";
+  let selectedClue = null;
+  let cluePopupMode = "view";
+  let selectedKeyword = null;
+  let reasoningSlots = Array(finalAnswers.length).fill("");
+  let dialogue = null;
+  let dialogueLocked = false;
+  let toastTimer = null;
+  let titleBgmTimer = null;
+  let objectionBgmTimer = null;
+  let timerBase = null;
+  let currentBgm = "";
+  let bgmTransitionRaf = null;
+  let outgoingBgm = null;
+  let birdTimeout = null;
+  let birdFrameTimer = null;
+  let birdVisible = false;
+  let drag = { active:false, moved:false, startX:0, startY:0, startPanX:0, startPanY:0 };
+  let panX = 0;
+  let panY = 0;
+  let sceneScale = 1;
+  let baseOffsetX = 0;
+  let baseOffsetY = 0;
+  let introLines = [];
+  let introIndex = 0;
+  let introBusy = false;
+  let pendingStartForceNew = false;
+
+  const audio = {
+    bgm: new Audio(),
+    sfx: {
+      click:new Audio("sfx/sfx_click.wav"),
+      next:new Audio("sfx/sfx_next.wav"),
+      popup:new Audio("sfx/sfx_popup.wav"),
+      snap:new Audio("sfx/sfx_snap.wav"),
+      found:new Audio("sfx/sfx_found.wav"),
+      confirm:new Audio("sfx/sfx_confirm.wav"),
+      cancel:new Audio("sfx/sfx_cancel.wav"),
+      flick:new Audio("sfx/sfx_flick.wav"),
+      correct:new Audio("sfx/sfx_correct.wav"),
+      wrong:new Audio("sfx/sfx_wrong.wav"),
+      windowopen:new Audio("sfx/sfx_windowopen.wav")
+    }
+  };
+  const BGM_VOLUME = .72;
+  audio.bgm.loop = true;
+  audio.bgm.volume = BGM_VOLUME;
+
+  function playSfx(name) {
+    const a = audio.sfx[name];
+    if (!a) return;
+    try { a.currentTime = 0; a.play().catch(()=>{}); } catch(e) {}
+  }
+  function cancelBgmTransition() {
+    if (bgmTransitionRaf !== null) {
+      cancelAnimationFrame(bgmTransitionRaf);
+      bgmTransitionRaf = null;
+    }
+    if (outgoingBgm) {
+      outgoingBgm.pause();
+      outgoingBgm = null;
+    }
+    audio.bgm.volume = BGM_VOLUME;
+  }
+
+  function playBgm(name) {
+    if (currentBgm === name && !audio.bgm.paused) return;
+    cancelBgmTransition();
+    currentBgm = name;
+    audio.bgm.pause();
+    audio.bgm.src = `bgm/${name}`;
+    audio.bgm.currentTime = 0;
+    audio.bgm.volume = BGM_VOLUME;
+    audio.bgm.play().catch(()=>{});
+  }
+
+  function transitionBgm(name, duration = 700) {
+    if (currentBgm === name && !audio.bgm.paused) return;
+    cancelBgmTransition();
+
+    const from = audio.bgm;
+    const fromStartVolume = from.paused ? 0 : from.volume;
+    const to = new Audio(`bgm/${name}`);
+    to.loop = true;
+    to.volume = 0;
+
+    audio.bgm = to;
+    outgoingBgm = from;
+    currentBgm = name;
+    to.play().catch(()=>{});
+
+    const startedAt = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - startedAt) / duration);
+      const eased = 0.5 - Math.cos(Math.PI * t) / 2;
+      from.volume = fromStartVolume * (1 - eased);
+      to.volume = BGM_VOLUME * eased;
+
+      if (t < 1) {
+        bgmTransitionRaf = requestAnimationFrame(tick);
+        return;
+      }
+
+      from.pause();
+      from.volume = BGM_VOLUME;
+      outgoingBgm = null;
+      bgmTransitionRaf = null;
+      to.volume = BGM_VOLUME;
+    };
+    bgmTransitionRaf = requestAnimationFrame(tick);
+  }
+
+  function stopBgm() {
+    cancelBgmTransition();
+    audio.bgm.pause();
+    currentBgm = "";
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return defaultState();
+      const parsed = JSON.parse(raw);
+      const merged = Object.assign(defaultState(), parsed);
+      if (!Array.isArray(merged.clues) || merged.clues.length !== 20) merged.clues = Array(20).fill(false);
+      if (!Array.isArray(merged.keywords)) merged.keywords = ["피해자","범인"];
+      if (!Array.isArray(merged.reasoningDraft) || merged.reasoningDraft.length !== finalAnswers.length) {
+        merged.reasoningDraft = Array(finalAnswers.length).fill("");
+      }
+      return merged;
+    } catch(e) {
+      return defaultState();
+    }
+  }
+  function saveState() {
+    if (state.runActive && timerBase !== null) {
+      const now = performance.now();
+      state.elapsedMs += now - timerBase;
+      timerBase = now;
+    }
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  }
+  function startTimer() { timerBase = performance.now(); }
+  function stopTimer() {
+    if (timerBase !== null) {
+      state.elapsedMs += performance.now() - timerBase;
+      timerBase = null;
+    }
+  }
+  function currentElapsed() {
+    return state.elapsedMs + (timerBase !== null ? performance.now() - timerBase : 0);
+  }
+
+  function applyNoir() {
+    $("app").classList.toggle("noir", state.noirOn);
+    $("startDoguri").src = state.noirOn ? "images/doguri_title_n.png" : "images/doguri_title.png";
+    $("doguriLeft").src = state.noirOn ? "images/doguri_left_n.png" : "images/doguri_left.png";
+    $("noirButton").textContent = `누아르 모드 ${state.noirOn ? "ON" : "OFF"}`;
+  }
+
+  function fadeToBlack(callback) {
+    $("fade").classList.add("on");
+    setTimeout(() => {
+      callback?.();
+      requestAnimationFrame(() => $("fade").classList.remove("on"));
+    }, 700);
+  }
+
+  function showToast(text, duration=2600) {
+    clearTimeout(toastTimer);
+    const el = $("toast");
+    el.textContent = text;
+    el.classList.add("show");
+    toastTimer = setTimeout(() => el.classList.remove("show"), duration);
+  }
+
+  function showToastSequence(messages, duration=2200, gap=220) {
+    clearTimeout(toastTimer);
+    const el = $("toast");
+    let index = 0;
+
+    const showNext = () => {
+      if (index >= messages.length) return;
+      el.textContent = messages[index++];
+      el.classList.add("show");
+      toastTimer = setTimeout(() => {
+        el.classList.remove("show");
+        if (index < messages.length) toastTimer = setTimeout(showNext, gap);
+      }, duration);
+    };
+
+    showNext();
+  }
+
+  function notifyClueAcquired(idx) {
+    const clue = clueData[idx];
+    const quoted = clue.keywords.map(k => `‘${k}’`).join(", ");
+    playSfx("found");
+    showToast(`${quoted} 키워드를 획득했습니다.`);
+  }
+
+  function notifyClueAcquiredDelayed(idx) {
+    setTimeout(() => notifyClueAcquired(idx), 250);
+  }
+
+  function updateMenuBadges() {
+    $("noteBadge").classList.toggle("hidden", !state.noteUpdated);
+    $("chatBadge").classList.toggle("hidden", !state.chatUpdated);
+  }
+
+  function setSceneVisible(on) {
+    $("sceneViewport").classList.toggle("hidden", !on);
+    $("mainUi").classList.toggle("hidden", !on);
+  }
+
+  function setMode(mode) {
+    const normalPlay = mode === "base" || mode === "investigate";
+    currentMode = normalPlay ? "investigate" : mode;
+    $("bottomBar").classList.toggle("hidden", !normalPlay);
+    $("backButton").classList.add("hidden");
+    $("settingsButton").classList.toggle("hidden", !normalPlay);
+    $("sceneViewport").classList.toggle("cursor-investigate", normalPlay);
+    $("sceneViewport").classList.remove("cursor-drag");
+    updateHotspots();
+    clampPan();
+  }
+
+  function resizeScene() {
+    const vw = innerWidth, vh = innerHeight;
+    sceneScale = Math.max(vw / 1920, vh / 1080);
+    const sw = 1920 * sceneScale;
+    const sh = 1080 * sceneScale;
+    baseOffsetX = (vw - sw) / 2;
+    baseOffsetY = (vh - sh) / 2;
+    clampPan();
+  }
+  function clampPan() {
+    const overflowX = Math.max(0, 1920 * sceneScale - innerWidth);
+    const overflowY = Math.max(0, 1080 * sceneScale - innerHeight);
+    const maxPanX = overflowX / 2;
+    const maxPanY = overflowY / 2;
+
+
+    panX = Math.min(maxPanX, Math.max(-maxPanX, panX));
+    panY = Math.min(maxPanY, Math.max(-maxPanY, panY));
+
+    const x = baseOffsetX + panX;
+    const y = baseOffsetY + panY;
+    $("sceneInner").style.transform = `translate3d(${x}px, ${y}px, 0) scale(${sceneScale})`;
+    updatePanArrows(maxPanX, maxPanY);
+  }
+
+  function updatePanArrows(maxPanX = Math.max(0, 1920 * sceneScale - innerWidth) / 2,
+                           maxPanY = Math.max(0, 1080 * sceneScale - innerHeight) / 2) {
+    const active = currentMode === "investigate" && !dialogueLocked;
+    const epsilon = .5;
+    $("panArrowW").classList.toggle("hidden", !active || maxPanX <= epsilon || panX >= maxPanX - epsilon);
+    $("panArrowE").classList.toggle("hidden", !active || maxPanX <= epsilon || panX <= -maxPanX + epsilon);
+    $("panArrowN").classList.toggle("hidden", !active || maxPanY <= epsilon || panY >= maxPanY - epsilon);
+    $("panArrowS").classList.toggle("hidden", !active || maxPanY <= epsilon || panY <= -maxPanY + epsilon);
+  }
+
+  function buildHotspots() {
+    const layer = $("hotspotLayer");
+    layer.innerHTML = "";
+    clueData.forEach((clue, idx) => {
+      if (clue.special === "bird") return;
+      const [x1,y1,x2,y2] = clue.rect;
+      const b = document.createElement("button");
+      b.className = "hotspot";
+      b.dataset.index = idx;
+      b.style.left = `${x1}px`;
+      b.style.top = `${y1}px`;
+      b.style.width = `${x2-x1}px`;
+      b.style.height = `${y2-y1}px`;
+      b.setAttribute("aria-label", clue.name);
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (drag.moved) return;
+        handleHotspot(idx);
+      });
+      layer.appendChild(b);
+    });
+    $("birdSprite").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (drag.moved) return;
+      if (currentMode === "investigate" && birdVisible && !state.clues[13]) acquireClue(13);
+    });
+  }
+
+  function updateHotspots() {
+    document.querySelectorAll(".hotspot").forEach((el) => {
+      const idx = Number(el.dataset.index);
+      let active = currentMode === "investigate" && !dialogueLocked;
+      if (idx === 0) active = active && state.windowOpen;
+      el.style.pointerEvents = active ? "auto" : "none";
+      el.style.zIndex = idx === 0 && state.windowOpen ? "2" : "1";
+    });
+    $("windowClosed").classList.toggle("hidden", state.windowOpen);
+    if (state.windowOpen) scheduleBird();
+    else stopBird();
+    updatePanArrows();
+  }
+
+  function handleHotspot(idx) {
+    if (currentMode !== "investigate" || dialogueLocked) return;
+    const clue = clueData[idx];
+
+    if (idx === 17) {
+      if (state.windowOpen || (state.clues[17] && !state.clues[12])) {
+        openDialogue([{speaker:"도구리", text:"이미 조사한 곳이야.", thought:true}], {mode:"first", onComplete:()=>setMode("investigate")});
+      } else {
+        handleWindow();
+      }
+      return;
+    }
+    if (state.clues[idx]) {
+      openDialogue([{speaker:"도구리", text:"이미 조사한 곳이야.", thought:true}], {mode:"first", onComplete:()=>setMode("investigate")});
+      return;
+    }
+    acquireClue(idx);
+  }
+
+  function acquireClue(idx) {
+    const clue = clueData[idx];
+    if (state.clues[idx]) return;
+
+    state.clues[idx] = true;
+    clue.keywords.forEach(k => {
+      if (!state.keywords.includes(k)) state.keywords.push(k);
+    });
+    state.noteUpdated = true;
+    saveState();
+    updateMenuBadges();
+
+    playSfx("snap");
+    showFoundCircle(idx);
+
+    if (idx === 13) $("birdSprite").classList.remove("active");
+    updateHotspots();
+
+    const entries = clue.lines.map(line => ({ speaker:"도구리", text:line, thought:true }));
+    openDialogue(entries, { mode:"first", onComplete:() => {
+      if (idx === 12 && !state.windowOpen) updateHotspots();
+      setMode("investigate");
+      notifyClueAcquiredDelayed(idx);
+    }});
+  }
+
+  function showFoundCircle(idx) {
+    const [x1,y1,x2,y2] = clueData[idx].rect;
+    const mark = document.createElement("div");
+    mark.className = "found-circle";
+    mark.style.left = `${(x1+x2)/2}px`;
+    mark.style.top = `${(y1+y2)/2}px`;
+    $("sceneInner").appendChild(mark);
+    setTimeout(() => mark.remove(), 3100);
+  }
+
+  function handleWindow() {
+    const hasKey = state.clues[12];
+    const newlyAcquiredWindow = !state.clues[17];
+    if (newlyAcquiredWindow) {
+      state.clues[17] = true;
+      if (!state.keywords.includes("창문")) state.keywords.push("창문");
+      state.noteUpdated = true;
+      saveState();
+      updateMenuBadges();
+      showFoundCircle(17);
+      playSfx("snap");
+    }
+
+    if (hasKey) {
+      openDialogue([
+        {speaker:"도구리", text:"열쇠가 맞네.", thought:true},
+        {speaker:"도구리", text:"누군가 일부러 창문을 잠근 건가…?", thought:true}
+      ], { mode:"first", onComplete:() => {
+        playSfx("windowopen");
+        state.windowOpen = true;
+        saveState();
+        updateHotspots();
+        setMode("investigate");
+        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17);
+      }});
+    } else {
+      openDialogue([
+        {speaker:"도구리", text:"창문은 안쪽에서 잠겨 있다.", thought:true},
+        {speaker:"도구리", text:"열쇠 구멍이 있지만 열쇠는 보이지 않는다.", thought:true}
+      ], { mode:"first", onComplete:() => {
+        setMode("investigate");
+        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17);
+      }});
+    }
+  }
+
+  function stopBird() {
+    clearTimeout(birdTimeout);
+    clearInterval(birdFrameTimer);
+    birdTimeout = null;
+    birdVisible = false;
+    $("birdSprite").style.opacity = 0;
+    $("birdSprite").style.transform = "translate(-40px, -40px) scale(0)";
+    $("birdSprite").classList.remove("active");
+  }
+
+  function scheduleBird() {
+    if (!state.windowOpen || birdTimeout || birdVisible) return;
+    birdTimeout = setTimeout(() => {
+      birdTimeout = null;
+      runBirdSequence();
+    }, 6000);
+  }
+
+  function setBirdFrame(frame) {
+    const col = frame % 4;
+    const row = Math.floor(frame / 4);
+    $("birdSprite").style.backgroundPosition = `${col * 100 / 3}% ${row * 100 / 3}%`;
+  }
+
+  function easeOutSine(t) { return Math.sin((t * Math.PI) / 2); }
+  function easeInOutSine(t) { return -(Math.cos(Math.PI * t) - 1) / 2; }
+
+  function tweenBird(duration, fromScale, toScale, fromX, toX, fromY, toY, easing, frameFn, done) {
+    const start = performance.now();
+    function tick(now) {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = easing(t);
+      const scale = fromScale + (toScale - fromScale) * eased;
+      const x = fromX + (toX - fromX) * eased;
+      const y = fromY + (toY - fromY) * eased;
+      $("birdSprite").style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+      frameFn?.(now-start);
+      if (t < 1 && birdVisible) requestAnimationFrame(tick);
+      else done?.();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function runBirdSequence() {
+    if (!state.windowOpen) return;
+    birdVisible = true;
+    const bird = $("birdSprite");
+    bird.style.opacity = 1;
+    bird.classList.toggle("active", !state.clues[13]);
+
+    let flip = 0;
+    tweenBird(750, 0, 1, -40, 0, -120, 0, easeOutSine, (elapsed) => {
+      const frame = Math.floor(elapsed / 150) % 2;
+      if (frame !== flip) flip = frame;
+      setBirdFrame(frame);
+    }, () => {
+      const sequence = [
+        [2,100],[3,100],[4,100],
+        [5,500],
+        [6,350],
+        [7,1500],
+        [8,100],[9,100],[10,100],[11,100],[12,100],[13,100]
+      ];
+      let pos = 0;
+      const playNext = () => {
+        if (!birdVisible) return;
+        if (pos >= sequence.length) {
+          const outStart = performance.now();
+          tweenBird(1000, 1, 0, 0, 40, 0, -100, easeOutSine, (elapsed) => {
+            setBirdFrame(14 + (Math.floor(elapsed / 100) % 2));
+          }, () => {
+            birdVisible = false;
+            bird.classList.remove("active");
+            bird.style.opacity = 0;
+            scheduleBird();
+          });
+          return;
+        }
+        const [frame, dur] = sequence[pos++];
+        setBirdFrame(frame);
+        setTimeout(playNext, dur);
+      };
+      playNext();
+    });
+  }
+
+  function openDialogue(entries, options={}) {
+    dialogueLocked = true;
+    dialogue = {
+      entries: entries.flatMap(entry => {
+        const lines = String(entry.text).split("\n");
+        return lines.map(line => ({...entry, text:line}));
+      }),
+      index: 0,
+      mode: options.mode || "first",
+      onComplete: options.onComplete || null
+    };
+    $("dialogueBlocker").classList.remove("hidden");
+    $("dialogueBox").classList.remove("hidden");
+    $("backButton").classList.add("hidden");
+    $("characterLayer").classList.remove("hidden");
+    showDialogueLine();
+    updateHotspots();
+  }
+
+  function showDialogueLine() {
+    const item = dialogue.entries[dialogue.index];
+    const isDoguri = item.speaker === "도구리";
+    $("speakerName").textContent = item.speaker;
+    $("speakerName").className = isDoguri ? "doguri" : "mung";
+    $("dialogueText").textContent = item.text;
+    $("dialogueText").className = `${item.thought ? "thought " : ""}${isDoguri ? "doguri" : "mung"}`.trim();
+    $("nextMark").classList.remove("hidden");
+
+    ["mungCenter","doguriLeft","mungRight"].forEach(id => $(id).classList.add("hidden"));
+    if (dialogue.mode === "first") {
+      if (!isDoguri) $("mungCenter").classList.remove("hidden");
+    } else {
+      if (isDoguri) $("doguriLeft").classList.remove("hidden");
+      else $("mungRight").classList.remove("hidden");
+    }
+  }
+
+  function advanceDialogue() {
+    if (!dialogueLocked || !dialogue) return;
+    playSfx("next");
+    dialogue.index++;
+    if (dialogue.index < dialogue.entries.length) {
+      showDialogueLine();
+      return;
+    }
+    const cb = dialogue.onComplete;
+    closeDialogue();
+    cb?.();
+  }
+
+  function closeDialogue() {
+    dialogueLocked = false;
+    dialogue = null;
+    $("dialogueBlocker").classList.add("hidden");
+    $("dialogueBox").classList.add("hidden");
+    $("characterLayer").classList.add("hidden");
+    ["mungCenter","doguriLeft","mungRight"].forEach(id => $(id).classList.add("hidden"));
+    $("backButton").classList.add("hidden");
+    updateHotspots();
+  }
+
+  function showChoice(options) {
+    $("characterLayer").classList.add("hidden");
+    ["mungCenter","doguriLeft","mungRight"].forEach(id => $(id).classList.add("hidden"));
+    $("dim").classList.remove("hidden");
+    $("choicePopup").classList.remove("hidden");
+    const stack = $("choiceStack");
+    stack.innerHTML = "";
+    options.forEach(opt => {
+      const b = document.createElement("button");
+      b.className = "choice-btn";
+      b.textContent = opt.label;
+      b.addEventListener("click", () => {
+        playSfx(opt.cancel ? "cancel" : "confirm");
+        hideChoice();
+        opt.action();
+      });
+      stack.appendChild(b);
+    });
+  }
+  function hideChoice() {
+    $("choicePopup").classList.add("hidden");
+    $("dim").classList.add("hidden");
+  }
+
+  function buildClueGrid() {
+    const grid = $("clueGrid");
+    grid.innerHTML = "";
+    clueData.forEach((clue, idx) => {
+      const b = document.createElement("button");
+      b.className = "clue-cell";
+      b.dataset.index = idx;
+      const sprite = document.createElement("span");
+      sprite.className = "clue-sprite";
+      const col = idx % 5;
+      const row = Math.floor(idx / 5);
+      sprite.style.backgroundImage = `url("images/${state.clues[idx] ? "clues_on.png" : "clues_off.png"}")`;
+      sprite.style.backgroundPosition = `${col*25}% ${row*25}%`;
+      const frame = document.createElement("span");
+      frame.className = "clue-frame";
+      b.append(sprite, frame);
+      b.addEventListener("click", () => selectClue(idx));
+      grid.appendChild(b);
+    });
+  }
+
+  function openCluePopup(mode) {
+    cluePopupMode = mode;
+    selectedClue = null;
+    buildClueGrid();
+    updateClueSelection();
+    $("clueCancelButton").classList.toggle("hidden", mode !== "present");
+    $("cluePresentButton").classList.toggle("hidden", mode !== "present");
+    $("clueConfirmButton").classList.add("hidden");
+
+    const keywordWrap = $("clueKeywords");
+    keywordWrap.innerHTML = "";
+    state.keywords.forEach(keyword => {
+      const chip = document.createElement("span");
+      chip.className = "clue-keyword-chip";
+      chip.textContent = keyword;
+      keywordWrap.appendChild(chip);
+    });
+
+    $("dim").classList.remove("hidden");
+    $("cluePopup").classList.remove("hidden");
+
+    if (mode === "present") {
+      showToast("단서를 선택해서 제시하자.");
+    }
+  }
+
+  function selectClue(idx) {
+    if (!state.clues[idx]) {
+      playSfx("cancel");
+      showToast("아직 찾지 못한 단서입니다.");
+      return;
+    }
+    playSfx("flick");
+    selectedClue = idx;
+    updateClueSelection();
+    if (cluePopupMode !== "present") {
+      openDialogue(clueData[idx].lines.map(text => ({speaker:"도구리", text, thought:true})), {mode:"first", onComplete:()=>{}});
+    }
+  }
+
+  function updateClueSelection() {
+    document.querySelectorAll(".clue-cell").forEach((el, i) => el.classList.toggle("selected", i === selectedClue));
+    $("cluePresentButton").disabled = cluePopupMode === "present" && selectedClue === null;
+  }
+
+  function closeCluePopup(resumeGameBgm = true) {
+    if (dialogueLocked) closeDialogue();
+    $("cluePopup").classList.add("hidden");
+    $("dim").classList.add("hidden");
+    selectedClue = null;
+    if (resumeGameBgm) playBgm("bgm_game.mp3");
+  }
+
+  function startRebuttal() {
+    if (state.rebuttalStage >= 5) return startFinalLeadIn();
+    setMode("conversation");
+    const stage = rebuttals[state.rebuttalStage];
+    openDialogue(stage.claim.map(text => ({speaker:"멍반장", text})), {
+      mode:"third",
+      onComplete:() => showChoice([
+        {label:"지금 반박한다", action:beginObjection},
+        {label:"조금 더 조사한다", cancel:true, action:returnToBase}
+      ])
+    });
+  }
+
+  function beginObjection() {
+    transitionBgm("bgm_finalclue.mp3", 700);
+    openCluePopup("present");
+  }
+
+  function submitEvidence() {
+    if (selectedClue === null) return;
+    const submittedClue = selectedClue;
+    const stage = rebuttals[state.rebuttalStage];
+    const correct = stage.correct.includes(submittedClue);
+    closeCluePopup(false);
+
+    if (!correct) {
+      stopBgm();
+      playSfx("wrong");
+      openDialogue([
+        {speaker:"멍반장", text:"그건 아닌 것 같습니다."},
+        {speaker:"멍반장", text:"왜 아닌지는… 조금만 더 생각해보겠습니다."}
+      ], {mode:"third", onComplete:returnToBase});
+      return;
+    }
+
+    clearTimeout(objectionBgmTimer);
+      objectionBgmTimer = null;
+      playBgm("bgm_objection.mp3");
+    const response = stage.response(submittedClue);
+    openDialogue(response, {mode:"third", onComplete:() => {
+      state.rebuttalStage++;
+      state.chatUpdated = true;
+      saveState();
+      updateMenuBadges();
+      returnToBase(true);
+    }});
+  }
+
+  function returnToBase(useBgmTransition = false) {
+    clearTimeout(objectionBgmTimer);
+    objectionBgmTimer = null;
+    closeAllPopups();
+    setMode("base");
+    if (useBgmTransition) transitionBgm("bgm_game.mp3", 700);
+    else playBgm("bgm_game.mp3");
+    updateHotspots();
+  }
+
+  function startFinalLeadIn() {
+    setMode("conversation");
+    openDialogue([
+      {speaker:"멍반장", text:"이쯤 되면 저도 압니다."},
+      {speaker:"멍반장", text:"제가 뭔가 모른다는 걸요."}
+    ], {mode:"third", onComplete:() => showChoice([
+      {label:"추리를 완성한다", action:startReasoning},
+      {label:"조금 더 조사한다", cancel:true, action:returnToBase}
+    ])});
+  }
+
+  function startReasoning() {
+    openReasoningPopup();
+  }
+
+  function openReasoningPopup() {
+    transitionBgm("bgm_finalclue.mp3", 700);
+    reasoningSlots = Array.isArray(state.reasoningDraft) && state.reasoningDraft.length === finalAnswers.length
+      ? state.reasoningDraft.slice()
+      : Array(finalAnswers.length).fill("");
+    selectedKeyword = null;
+    renderReasoning();
+    $("dim").classList.remove("hidden");
+    $("reasoningPopup").classList.remove("hidden");
+  }
+
+  function renderReasoning() {
+    const container = $("reasoningText");
+    container.innerHTML = "";
+
+    const lines = [
+      [0, "는 ", 1, " 때문에 넘어진 것이 아니다."],
+      ["머리의 ", 2, "과 ", 3, "은 ", 4, "처럼 보이게 하려는 ", 5, "이다."],
+      ["진짜 ", 6, "은 몸에 난 깊고 좁은 ", 7, "."],
+      [8, "은 흉기를 남기지 않기 위해 ", 9, " 위에 올라가, 창밖 처마의 ", 10, "을 꺾어 ", 11, "를 찔렀다."],
+      ["그리고 ", 12, "을 잠근 뒤, ", 13, "를 숨겼다."],
+      ["창밖의 눈에 발자국을 남기지 않기 위해, 잠금 장치를 누른 뒤 ", 14, "으로 나갔다."]
+    ];
+
+    lines.forEach(parts => {
+      const div = document.createElement("div");
+      parts.forEach(part => {
+        if (typeof part === "number") div.appendChild(makeSlot(part));
+        else div.appendChild(document.createTextNode(part));
+      });
+      container.appendChild(div);
+    });
+
+    const bank = $("keywordBank");
+    bank.innerHTML = "";
+
+    const usedKeywordCount = reasoningSlots.reduce((counts, word) => {
+      if (word) counts[word] = (counts[word] || 0) + 1;
+      return counts;
+    }, {});
+    const requiredKeywordCount = finalAcceptedAnswers.reduce((counts, options) => {
+      options.forEach(word => {
+        counts[word] = (counts[word] || 0) + 1;
+      });
+      return counts;
+    }, {});
+
+    state.keywords.forEach(word => {
+      const availableCount = Math.max(1, requiredKeywordCount[word] || 0) - (usedKeywordCount[word] || 0);
+      if (availableCount <= 0) return;
+
+      const chip = document.createElement("button");
+      chip.className = "keyword-chip";
+      chip.textContent = word;
+      chip.draggable = true;
+      chip.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", word);
+        selectedKeyword = word;
+        updateKeywordSelection();
+
+        const preview = document.createElement("div");
+        preview.className = "keyword-drag-preview";
+        const previewChip = chip.cloneNode(true);
+        previewChip.classList.add("selected");
+        preview.appendChild(previewChip);
+        document.body.appendChild(preview);
+
+        e.dataTransfer.setDragImage(
+          preview,
+          preview.offsetWidth / 2,
+          preview.offsetHeight / 2
+        );
+        setTimeout(() => preview.remove(), 0);
+      });
+      chip.addEventListener("click", () => {
+        playSfx("flick");
+        selectedKeyword = selectedKeyword === word ? null : word;
+        updateKeywordSelection();
+      });
+      bank.appendChild(chip);
+    });
+    updateKeywordSelection();
+    updateReasoningConfirmState();
+  }
+
+  function updateReasoningConfirmState() {
+    $("reasoningConfirm").disabled = !reasoningSlots.every(Boolean);
+  }
+
+  function makeSlot(idx) {
+    const slot = document.createElement("button");
+    slot.className = "blank-slot";
+    slot.dataset.slot = idx;
+    slot.textContent = reasoningSlots[idx] || "";
+    slot.addEventListener("click", () => {
+      if (selectedKeyword) {
+        reasoningSlots[idx] = selectedKeyword;
+        playSfx("flick");
+        selectedKeyword = null;
+        renderReasoning();
+      } else if (reasoningSlots[idx]) {
+        reasoningSlots[idx] = "";
+        renderReasoning();
+      }
+    });
+    slot.addEventListener("dragover", e => {
+      e.preventDefault();
+    });
+    slot.addEventListener("drop", e => {
+      e.preventDefault();
+      reasoningSlots[idx] = e.dataTransfer.getData("text/plain");
+      selectedKeyword = null;
+      playSfx("flick");
+      renderReasoning();
+    });
+    return slot;
+  }
+
+  function updateKeywordSelection() {
+    document.querySelectorAll(".keyword-chip").forEach(el => el.classList.toggle("selected", el.textContent === selectedKeyword));
+  }
+
+  function cancelReasoning(useBgmTransition = true) {
+    state.reasoningDraft = reasoningSlots.slice();
+    saveState();
+    $("reasoningPopup").classList.add("hidden");
+    $("dim").classList.add("hidden");
+    returnToBase(useBgmTransition);
+  }
+
+  function submitReasoning() {
+    if (!reasoningSlots.every(Boolean)) return;
+    const correct = finalAcceptedAnswers.every((options, i) => options.includes(reasoningSlots[i]));
+    $("reasoningPopup").classList.add("hidden");
+    $("dim").classList.add("hidden");
+
+    if (!correct) {
+      state.reasoningDraft = reasoningSlots.slice();
+      saveState();
+      transitionBgm("bgm_game.mp3", 700);
+      playSfx("wrong");
+      openDialogue([
+        {speaker:"멍반장", text:"뭔가 놓친 것 같습니다."},
+        {speaker:"멍반장", text:"하지만 뭘 놓쳤는지는 놓쳤습니다."}
+      ], {mode:"third", onComplete:returnToBase});
+      return;
+    }
+
+    state.reasoningDraft = Array(finalAnswers.length).fill("");
+    playSfx("correct");
+    completeGame();
+  }
+
+  function completeGame() {
+    stopTimer();
+    state.finalTimeMs = state.elapsedMs;
+    state.runActive = false;
+    state.completed = true;
+    state.pendingNewRound = true;
+    saveState();
+    showToast("추리 완료!", 3200);
+    transitionBgm("bgm_peace.mp3", 700);
+
+    setTimeout(() => {
+      openDialogue([
+        {speaker:"도구리", text:"이건 단순한 사고가 아닙니다."},
+        {speaker:"도구리", text:"피해자는 누군가에게 살해당한 거예요."},
+        {speaker:"멍반장", text:"사고사가 아니라… 제가 사고를 칠 뻔했네요."}
+      ], {mode:"third", onComplete:showClearPopup});
+    }, 450);
+  }
+
+  function formatTime(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  }
+
+  function showClearPopup() {
+    closeAllPopups();
+    const count = state.clues.filter(Boolean).length;
+    $("clearStats").innerHTML = `
+      <div class="stat-row"><span>클리어 시간</span><strong>${formatTime(state.finalTimeMs)}</strong></div>
+      <div class="stat-row"><span>단서 수집</span><strong>${String(count).padStart(2,"0")} / 20</strong></div>
+    `;
+    $("dim").classList.remove("hidden");
+    $("clearPopup").classList.remove("hidden");
+    playSfx("popup");
+
+    if (count === 20) {
+      state.noirUnlocked = true;
+      saveState();
+      setTimeout(() => {
+        showToastSequence([
+          "현장 조사 100% 완료!",
+          "누아르 모드를 해금했습니다."
+        ]);
+      }, 120);
+    }
+  }
+
+  function updateTitleActionButtons() {
+    const resume = state.runActive && !state.completed;
+    $("startPrimaryButton").textContent = resume ? "이어하기" : "시작하기";
+    $("startNewButton").classList.toggle("hidden", !resume);
+  }
+
+  function pauseBgmForTitleGate() {
+    clearTimeout(titleBgmTimer);
+    titleBgmTimer = null;
+    stopBgm();
+  }
+
+  function showInitialScreen() {
+    $("startScreen").classList.add("hidden");
+    $("initialScreen").classList.remove("hidden");
+    $("startPrompt").classList.remove("hidden");
+    $("startActions").classList.remove("hidden");
+    updateTitleActionButtons();
+    currentMode = "initial";
+    pauseBgmForTitleGate();
+  }
+
+  function enterTitleFromInitial() {
+    pendingStartForceNew = true;
+    playSfx("confirm");
+    pauseBgmForTitleGate();
+    fadeToBlack(() => {
+      $("initialScreen").classList.add("hidden");
+      $("startScreen").classList.remove("hidden");
+      $("startPrompt").classList.remove("hidden");
+      currentMode = "title";
+      clearTimeout(titleBgmTimer);
+      titleBgmTimer = setTimeout(() => {
+        titleBgmTimer = null;
+        if (currentMode === "title" && !$("startScreen").classList.contains("hidden")) {
+          playBgm("bgm_start.mp3");
+        }
+      }, 500);
+    });
+  }
+
+  function resumeFromInitial() {
+    playSfx("confirm");
+    fadeToBlack(() => {
+      $("initialScreen").classList.add("hidden");
+      setSceneVisible(true);
+      startTimer();
+      playBgm("bgm_game.mp3");
+      setMode("base");
+      updateHotspots();
+      showToast("이전 진행을 이어서 시작합니다.");
+    });
+  }
+
+  function goTitleAfterClear() {
+    if (state.clues.filter(Boolean).length === 20) state.noirOn = true;
+    state.completed = true;
+    state.runActive = false;
+    saveState();
+    applyNoir();
+
+    fadeToBlack(() => {
+      closeAllPopups();
+      setSceneVisible(false);
+      showInitialScreen();
+    });
+  }
+
+  function beginFromTitle() {
+    playSfx("click");
+    currentMode = "titleTransition";
+    clearTimeout(titleBgmTimer);
+    titleBgmTimer = null;
+    fadeToBlack(() => {
+      $("startScreen").classList.add("hidden");
+      if (state.pendingNewRound) {
+        state.round++;
+        state.pendingNewRound = false;
+      }
+      resetCurrentRun(false);
+      state.runActive = true;
+      state.completed = false;
+      saveState();
+      startTimer();
+      playIntro();
+    });
+  }
+
+  function resetCurrentRun(keepMode=true) {
+    stopBird();
+    state.runActive = false;
+    state.completed = false;
+    state.clues = Array(20).fill(false);
+    state.keywords = ["피해자","범인"];
+    state.rebuttalStage = 0;
+    state.windowOpen = false;
+    state.noteUpdated = false;
+    state.chatUpdated = false;
+    state.elapsedMs = 0;
+    state.finalTimeMs = 0;
+    panX = 0;
+    panY = 0;
+    timerBase = null;
+    saveState();
+    updateMenuBadges();
+    updateHotspots();
+    if (keepMode) {
+      state.runActive = true;
+      startTimer();
+      saveState();
+      returnToBase();
+      showToast("현재 회차의 진행 상황을 초기화했습니다.");
+    }
+  }
+
+  function playIntro() {
+    currentMode = "intro";
+    pauseBgmForTitleGate();
+    setSceneVisible(false);
+    $("introScreen").classList.remove("hidden");
+    introLines = [
+      "잠긴 방에서 누군가 숨진 채 발견됐다.",
+      "방 안에는 술 냄새가 진동했고,",
+      "피해자의 머리에는 커다란 혹이 보였다."
+    ];
+    introIndex = 0;
+    introBusy = false;
+    showIntroLine();
+  }
+
+  function showIntroLine() {
+    const el = $("introText");
+    el.textContent = introLines[introIndex] || "";
+    requestAnimationFrame(() => el.classList.add("show"));
+  }
+
+  function advanceIntro() {
+    if (currentMode !== "intro" || introBusy) return;
+    playSfx("click");
+    introBusy = true;
+    const el = $("introText");
+    el.classList.remove("show");
+    setTimeout(() => {
+      introIndex++;
+      if (introIndex < introLines.length) {
+        showIntroLine();
+        introBusy = false;
+      } else {
+        currentMode = "introTransition";
+        startOpeningDialogue();
+      }
+    }, 320);
+  }
+
+  function startOpeningDialogue() {
+    fadeToBlack(() => {
+      $("introScreen").classList.add("hidden");
+      setSceneVisible(true);
+      setMode("conversation");
+      playBgm("bgm_game.mp3");
+      openDialogue([
+        {speaker:"도구리", text:"으으…", thought:true},
+        {speaker:"도구리", text:"사건 현장이라니 조금 무서워…", thought:true},
+        {speaker:"멍반장", text:"…도구리 탐정님?"},
+        {speaker:"도구리", text:"아, 바, 반장님."},
+        {speaker:"멍반장", text:"술도 있고, 머리에 혹도 있고…"},
+        {speaker:"멍반장", text:"이건 딱 봐도 사고사입니다."},
+        {speaker:"도구리", text:"그, 그런 것 같긴 한데요…"},
+        {speaker:"도구리", text:"그… 딱 보지 말고, 조금만 더 보면 안 될까요?"},
+        {speaker:"멍반장", text:"더 볼 게 있나요?"},
+        {speaker:"멍반장", text:"방문은 잠겨 있었고, 창밖의 눈에도 발자국 하나 없습니다."},
+        {speaker:"도구리", text:"네… 그런데 왠지 너무 쉽게 끝나는 것 같아서요."}
+      ], {mode:"first", onComplete:() => {
+        setMode("base");
+        showToast("현장의 수상한 곳을 조사하세요.");
+      }});
+    });
+  }
+
+  function openSettings() {
+    $("roundInfo").classList.toggle("hidden", state.round < 2);
+    $("roundInfo").textContent = `${state.round}회차`;
+    $("noirButton").classList.toggle("hidden", !state.noirUnlocked);
+    applyNoir();
+    $("dim").classList.remove("hidden");
+    $("settingsPopup").classList.remove("hidden");
+    playSfx("popup");
+  }
+
+  function goTitleFromSettings() {
+    stopTimer();
+    saveState();
+    fadeToBlack(() => {
+      closeAllPopups();
+      setSceneVisible(false);
+      showInitialScreen();
+    });
+  }
+
+  function showMessage(text, buttons=[{label:"확인", action:closeMessage}]) {
+    $("messageText").textContent = text;
+    const actions = $("messageActions");
+    actions.innerHTML = "";
+    buttons.forEach(btn => {
+      const b = document.createElement("button");
+      b.className = "action-btn";
+      b.textContent = btn.label;
+      b.addEventListener("click", () => {
+        playSfx(btn.cancel ? "cancel" : "confirm");
+        btn.action();
+      });
+      actions.appendChild(b);
+    });
+    $("messagePopup").classList.remove("hidden");
+    playSfx("popup");
+  }
+  function closeMessage() { $("messagePopup").classList.add("hidden"); }
+
+  function hintText() {
+    if (state.rebuttalStage >= 5) {
+      const complete = finalAcceptedAnswers.every(options => options.some(word => state.keywords.includes(word)));
+      return complete ? "단서는 이제 충분합니다." : "아직 단서가 부족합니다.";
+    }
+    const correct = rebuttals[state.rebuttalStage].correct;
+    const acquired = correct.find(idx => state.clues[idx]);
+    return acquired === undefined ? "현장을 조사하세요." : "필요한 단서가 이미 있습니다.";
+  }
+
+  function isVisible(id) {
+    return !$(id).classList.contains("hidden");
+  }
+
+  function dismissTopPopup() {
+    if (dialogueLocked) return;
+
+    if (isVisible("messagePopup")) {
+      playSfx("cancel");
+      closeMessage();
+      const hasPopupUnder = ["settingsPopup","choicePopup","cluePopup","reasoningPopup","clearPopup"].some(isVisible);
+      $("dim").classList.toggle("hidden", !hasPopupUnder);
+      return;
+    }
+
+    if (isVisible("settingsPopup")) {
+      playSfx("cancel");
+      $("settingsPopup").classList.add("hidden");
+      $("dim").classList.add("hidden");
+      return;
+    }
+
+    if (isVisible("cluePopup")) {
+      if (cluePopupMode === "present") return;
+
+      playSfx("cancel");
+      closeCluePopup();
+      returnToBase();
+      return;
+    }
+
+    if (isVisible("reasoningPopup")) {
+      playSfx("cancel");
+      cancelReasoning(false);
+      return;
+    }
+
+    if (isVisible("choicePopup")) {
+      return;
+    }
+
+    if (isVisible("clearPopup")) {
+      playSfx("confirm");
+      goTitleAfterClear();
+    }
+  }
+
+  function closeAllPopups() {
+    ["choicePopup","cluePopup","reasoningPopup","settingsPopup","messagePopup","clearPopup"].forEach(id => $(id).classList.add("hidden"));
+    $("dim").classList.add("hidden");
+    $("characterLayer").classList.add("hidden");
+    ["mungCenter","doguriLeft","mungRight"].forEach(id => $(id).classList.add("hidden"));
+    if (dialogueLocked) closeDialogue();
+  }
+
+  // Events
+  $("startScreen").addEventListener("click", beginFromTitle);
+  $("startPrimaryButton").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const resume = state.runActive && !state.completed;
+    if (resume) resumeFromInitial();
+    else enterTitleFromInitial();
+  });
+  $("startNewButton").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const hasSavedProgress = state.runActive && !state.completed;
+    if (!hasSavedProgress) {
+      enterTitleFromInitial();
+      return;
+    }
+    playSfx("popup");
+    $("newGameConfirmDim").classList.remove("hidden");
+    $("newGameConfirmPopup").classList.remove("hidden");
+  });
+  $("newGameCancelButton").addEventListener("click", () => {
+    playSfx("cancel");
+    $("newGameConfirmPopup").classList.add("hidden");
+    $("newGameConfirmDim").classList.add("hidden");
+  });
+  $("newGameConfirmButton").addEventListener("click", () => {
+    $("newGameConfirmPopup").classList.add("hidden");
+    $("newGameConfirmDim").classList.add("hidden");
+    resetCurrentRun(false);
+    enterTitleFromInitial();
+  });
+  $("introScreen").addEventListener("click", advanceIntro);
+  $("dim").addEventListener("click", dismissTopPopup);
+  $("noteButton").addEventListener("click", () => {
+    playSfx("click");
+    state.noteUpdated = false;
+    saveState();
+    updateMenuBadges();
+    openCluePopup("view");
+  });
+  $("chatButton").addEventListener("click", () => {
+    playSfx("click");
+    state.chatUpdated = false;
+    saveState();
+    updateMenuBadges();
+    startRebuttal();
+  });
+  $("settingsButton").querySelector("button").addEventListener("click", openSettings);
+  $("backButton").querySelector("button").addEventListener("click", () => { playSfx("cancel"); returnToBase(); });
+
+  $("dialogueBox").addEventListener("click", advanceDialogue);
+  $("dialogueBlocker").addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    advanceDialogue();
+  });
+
+  $("clueConfirmButton").addEventListener("click", () => { playSfx("confirm"); closeCluePopup(); returnToBase(); });
+  $("clueCancelButton").addEventListener("click", () => {
+    playSfx("cancel");
+    closeCluePopup();
+    showChoice([
+      {label:"지금 반박한다", action:beginObjection},
+      {label:"조금 더 조사한다", cancel:true, action:returnToBase}
+    ]);
+  });
+  $("cluePresentButton").addEventListener("click", submitEvidence);
+
+  $("reasoningCancel").addEventListener("click", () => { playSfx("cancel"); cancelReasoning(true); });
+  $("reasoningConfirm").addEventListener("click", submitReasoning);
+
+  $("titleButton").addEventListener("click", () => { playSfx("confirm"); goTitleFromSettings(); });
+  $("hintButton").addEventListener("click", () => {
+    playSfx("confirm");
+    $("settingsPopup").classList.add("hidden");
+    $("dim").classList.add("hidden");
+    showToast(hintText());
+  });
+  $("noirButton").addEventListener("click", () => {
+    playSfx("confirm");
+    state.noirOn = !state.noirOn;
+    saveState();
+    applyNoir();
+  });
+
+  $("clearConfirm").addEventListener("click", () => { playSfx("confirm"); goTitleAfterClear(); });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.code !== "Space") return;
+    if (dialogueLocked) {
+      e.preventDefault();
+      advanceDialogue();
+    } else if (currentMode === "intro") {
+      e.preventDefault();
+      advanceIntro();
+    }
+  });
+
+  // Scene panning and empty-space investigation.
+  $("sceneViewport").addEventListener("pointerdown", (e) => {
+    if (currentMode !== "investigate" || dialogueLocked) return;
+    drag.active = true;
+    drag.moved = false;
+    drag.startX = e.clientX;
+    drag.startY = e.clientY;
+    drag.startPanX = panX;
+    drag.startPanY = panY;
+    drag.startedOnClue = !!e.target.closest?.(".hotspot, #birdSprite");
+    // 시작한 요소가 포인터를 잡게 하면 단서 위에서도 드래그할 수 있고,
+    // 거의 움직이지 않은 경우에는 기존 클릭 판정도 그대로 유지된다.
+    e.target.setPointerCapture?.(e.pointerId);
+  });
+  $("sceneViewport").addEventListener("pointermove", (e) => {
+    if (!drag.active || currentMode !== "investigate") return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (Math.hypot(dx, dy) > 8 && !drag.moved) {
+      drag.moved = true;
+      $("sceneViewport").classList.add("cursor-drag");
+    }
+    if (drag.moved) {
+      panX = drag.startPanX + dx;
+      panY = drag.startPanY + dy;
+      clampPan();
+    }
+  });
+  function finishSceneDrag(e) {
+    if (!drag.active) return;
+    const wasMoved = drag.moved;
+    drag.active = false;
+    $("sceneViewport").classList.remove("cursor-drag");
+    $("sceneViewport").classList.toggle("cursor-investigate", currentMode === "investigate");
+    setTimeout(() => { drag.moved = false; }, 0);
+    if (!wasMoved && !drag.startedOnClue && e.type === "pointerup" && e.target === $("sceneViewport")) {
+      openDialogue([{speaker:"도구리", text:"여긴… 아무것도 없는 것 같아.", thought:true}], {mode:"first", onComplete:()=>setMode("investigate")});
+    }
+  }
+  $("sceneViewport").addEventListener("pointerup", finishSceneDrag);
+  $("sceneViewport").addEventListener("pointercancel", finishSceneDrag);
+  $("sceneInner").addEventListener("click", (e) => {
+    if (dialogueLocked || drag.moved) return;
+    const isEmptyScene = e.target === $("sceneBg") || e.target === $("sceneInner") || e.target === $("hotspotLayer");
+    if (!isEmptyScene) return;
+
+    if (currentMode === "investigate") {
+      openDialogue([{speaker:"도구리", text:"여긴… 아무것도 없는 것 같아.", thought:true}], {mode:"first", onComplete:()=>setMode("investigate")});
+    }
+  });
+
+  window.addEventListener("resize", resizeScene);
+  window.addEventListener("beforeunload", saveState);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) saveState(); });
+  setInterval(() => { if (state.runActive) saveState(); }, 10000);
+
+  // Prevent browser zoom gestures.
+  document.addEventListener("gesturestart", e => e.preventDefault(), {passive:false});
+  document.addEventListener("dblclick", e => e.preventDefault(), {passive:false});
+  document.addEventListener("wheel", e => {
+    if (e.ctrlKey) e.preventDefault();
+  }, {passive:false});
+
+  // Initialize
+  buildHotspots();
+  resizeScene();
+  applyNoir();
+  updateMenuBadges();
+  updateHotspots();
+  showInitialScreen();
+})();
+</script>
+</body>
+</html>
