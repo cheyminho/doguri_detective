@@ -56,7 +56,6 @@
     overflow: hidden;
     background: #000;
   }
-  #app.noir { filter: grayscale(1); }
 
   .hidden { display: none !important; }
   .serif { font-family: Georgia, "Times New Roman", "Noto Serif KR", serif; }
@@ -657,7 +656,7 @@
 
   /* Reasoning */
   #reasoningPopup {
-    width: min(92vw, 980px);
+    width: min(96vw, 1040px);
     max-height: 92vh;
     overflow: visible;
     background: transparent;
@@ -720,17 +719,85 @@
     pointer-events: none;
   }
 
-  /* Clear popup */
-  #clearStats {
-    display: grid;
-    gap: 12px;
-    padding: 18px;
-    background: rgba(255,255,255,.08);
-    border-radius: 18px;
-    margin-top: 18px;
+  /* Clear result */
+  #clearPopup {
+    position: absolute;
+    inset: 0;
+    left: 0;
+    top: 0;
+    z-index: 70;
+    transform: none;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    overflow: hidden;
+    padding: max(34px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(30px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+    border-radius: 0;
+    background: #000;
   }
-  .stat-row { display: flex; justify-content: space-between; gap: 20px; font-size: clamp(20px,2vw,28px); }
-
+  #clearContent {
+    width: min(90vw, 780px);
+    height: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: center;
+  }
+  #clearTitle {
+    margin: clamp(18px, 5vh, 56px) 0 clamp(28px, 5vh, 58px);
+    font-size: clamp(46px, 7vw, 92px);
+    line-height: 1;
+    font-weight: 900;
+  }
+  .clear-info {
+    margin: 8px 0;
+    font-size: clamp(20px, 2.1vw, 30px);
+    font-weight: 700;
+    line-height: 1.45;
+    position: relative;
+    top: clamp(6px, 1vh, 12px);
+  }
+  #clearScoreLabel {
+    margin-top: clamp(32px, 6vh, 70px);
+    font-size: clamp(17px, 1.65vw, 24px);
+    font-weight: 500;
+    color: rgba(255,255,255,.82);
+  }
+  #clearScore {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    margin-top: 10px;
+    line-height: 1;
+  }
+  #clearScoreValue {
+    font-size: clamp(86px, 13vw, 164px);
+    font-weight: 900;
+    letter-spacing: -.04em;
+  }
+  #clearScoreUnit {
+    margin-left: 8px;
+    font-size: clamp(25px, 3vw, 42px);
+    font-weight: 400;
+  }
+  #clearActions {
+    margin-top: auto;
+    margin-bottom: clamp(18px, 5vh, 56px);
+  }
+  #clearConfirm {
+    min-width: min(72vw, 260px);
+  }
+  .clear-reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity .48s ease, transform .58s cubic-bezier(.22, 1, .36, 1);
+  }
+  .clear-reveal.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
 
   /* Fade */
   #fade {
@@ -783,7 +850,7 @@
       <button id="startPrimaryButton" class="start-action-btn">시작하기</button>
       <button id="startNewButton" class="start-action-btn">처음부터</button>
     </div>
-    <div id="versionLabel">v0.1</div>
+    <div id="versionLabel">v0.11</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -877,11 +944,10 @@
 
   <div id="settingsPopup" class="popup hidden">
     <h2>설정</h2>
-    <p id="roundInfo" class="hidden"></p>
     <div class="choice-stack">
       <button id="hintButton" class="choice-btn">힌트 보기</button>
       <button id="titleButton" class="choice-btn">시작 화면으로 돌아가기</button>
-      <button id="noirButton" class="choice-btn hidden">누아르 모드 OFF</button>
+      <button id="strangeHatButton" class="choice-btn hidden">이상한 모자 OFF</button>
     </div>
   </div>
 
@@ -890,11 +956,18 @@
     <div id="messageActions" class="popup-actions"></div>
   </div>
 
-  <div id="clearPopup" class="popup hidden">
-    <h2>사건 해결</h2>
-    <div id="clearStats"></div>
-    <div class="popup-actions">
-      <button id="clearConfirm" class="action-btn">확인</button>
+  <div id="clearPopup" class="hidden">
+    <div id="clearContent">
+      <h2 id="clearTitle" class="clear-reveal">클리어!</h2>
+      <div id="clearClueCount" class="clear-info clear-reveal"></div>
+      <div id="clearTime" class="clear-info clear-reveal"></div>
+      <div id="clearScoreLabel" class="clear-reveal">당신의 추리력은</div>
+      <div id="clearScore" class="clear-reveal">
+        <strong id="clearScoreValue">0</strong><span id="clearScoreUnit">점</span>
+      </div>
+      <div id="clearActions" class="popup-actions clear-reveal">
+        <button id="clearConfirm" class="action-btn">확인</button>
+      </div>
     </div>
   </div>
 
@@ -998,19 +1071,19 @@
   ];
 
   const defaultState = () => ({
-    version: 1,
+    version: 2,
     runActive: false,
     completed: false,
     clues: Array(20).fill(false),
     keywords: ["피해자","범인"],
     rebuttalStage: 0,
+    wrongRebuttalCount: 0,
+    wrongReasoningCount: 0,
     windowOpen: false,
     elapsedMs: 0,
     finalTimeMs: 0,
-    noirUnlocked: false,
-    noirOn: false,
-    round: 1,
-    pendingNewRound: false,
+    strangeHatUnlocked: false,
+    strangeHatOn: false,
     noteUpdated: false,
     chatUpdated: false,
     reasoningDraft: Array(finalAnswers.length).fill("")
@@ -1025,6 +1098,9 @@
   let dialogue = null;
   let dialogueLocked = false;
   let toastTimer = null;
+  let investigationCompleteToastUntil = 0;
+  let clearRevealTimers = [];
+  let clearScoreRaf = null;
   let titleBgmTimer = null;
   let objectionBgmTimer = null;
   let timerBase = null;
@@ -1043,7 +1119,6 @@
   let introLines = [];
   let introIndex = 0;
   let introBusy = false;
-  let pendingStartForceNew = false;
 
   const audio = {
     bgm: new Audio(),
@@ -1140,12 +1215,21 @@
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return defaultState();
       const parsed = JSON.parse(raw);
-      const merged = Object.assign(defaultState(), parsed);
+      const base = defaultState();
+      const merged = Object.fromEntries(
+        Object.keys(base).map(key => [key, Object.prototype.hasOwnProperty.call(parsed, key) ? parsed[key] : base[key]])
+      );
+      merged.version = base.version;
       if (!Array.isArray(merged.clues) || merged.clues.length !== 20) merged.clues = Array(20).fill(false);
       if (!Array.isArray(merged.keywords)) merged.keywords = ["피해자","범인"];
       if (!Array.isArray(merged.reasoningDraft) || merged.reasoningDraft.length !== finalAnswers.length) {
         merged.reasoningDraft = Array(finalAnswers.length).fill("");
       }
+      merged.wrongRebuttalCount = Math.max(0, Number(merged.wrongRebuttalCount) || 0);
+      merged.wrongReasoningCount = Math.max(0, Number(merged.wrongReasoningCount) || 0);
+      merged.strangeHatUnlocked = Boolean(merged.strangeHatUnlocked);
+      merged.strangeHatOn = merged.strangeHatUnlocked && Boolean(merged.strangeHatOn);
+      localStorage.setItem(SAVE_KEY, JSON.stringify(merged));
       return merged;
     } catch(e) {
       return defaultState();
@@ -1170,11 +1254,10 @@
     return state.elapsedMs + (timerBase !== null ? performance.now() - timerBase : 0);
   }
 
-  function applyNoir() {
-    $("app").classList.toggle("noir", state.noirOn);
-    $("startDoguri").src = state.noirOn ? "images/doguri_title_n.png" : "images/doguri_title.png";
-    $("doguriLeft").src = state.noirOn ? "images/doguri_left_n.png" : "images/doguri_left.png";
-    $("noirButton").textContent = `누아르 모드 ${state.noirOn ? "ON" : "OFF"}`;
+  function applyStrangeHat() {
+    $("startDoguri").src = state.strangeHatOn ? "images/doguri_title_n.png" : "images/doguri_title.png";
+    $("doguriLeft").src = state.strangeHatOn ? "images/doguri_left_n.png" : "images/doguri_left.png";
+    $("strangeHatButton").textContent = `이상한 모자 ${state.strangeHatOn ? "ON" : "OFF"}`;
   }
 
   function fadeToBlack(callback) {
@@ -1193,24 +1276,6 @@
     toastTimer = setTimeout(() => el.classList.remove("show"), duration);
   }
 
-  function showToastSequence(messages, duration=2200, gap=220) {
-    clearTimeout(toastTimer);
-    const el = $("toast");
-    let index = 0;
-
-    const showNext = () => {
-      if (index >= messages.length) return;
-      el.textContent = messages[index++];
-      el.classList.add("show");
-      toastTimer = setTimeout(() => {
-        el.classList.remove("show");
-        if (index < messages.length) toastTimer = setTimeout(showNext, gap);
-      }, duration);
-    };
-
-    showNext();
-  }
-
   function notifyClueAcquired(idx) {
     const clue = clueData[idx];
     const quoted = clue.keywords.map(k => `‘${k}’`).join(", ");
@@ -1218,8 +1283,17 @@
     showToast(`${quoted} 키워드를 획득했습니다.`);
   }
 
+  function notifyInvestigationCompleteIfNeeded() {
+    if (state.clues.filter(Boolean).length !== 20) return;
+    const duration = 2600;
+    investigationCompleteToastUntil = performance.now() + duration;
+    showToast("현장 조사 100% 완료!", duration);
+  }
+
   function notifyClueAcquiredDelayed(idx) {
-    setTimeout(() => notifyClueAcquired(idx), 250);
+    const remaining = investigationCompleteToastUntil - performance.now();
+    const delay = Math.max(250, remaining > 0 ? remaining + 220 : 250);
+    setTimeout(() => notifyClueAcquired(idx), delay);
   }
 
   function updateMenuBadges() {
@@ -1351,6 +1425,7 @@
     state.noteUpdated = true;
     saveState();
     updateMenuBadges();
+    notifyInvestigationCompleteIfNeeded();
 
     playSfx("snap");
     showFoundCircle(idx);
@@ -1385,6 +1460,7 @@
       state.noteUpdated = true;
       saveState();
       updateMenuBadges();
+      notifyInvestigationCompleteIfNeeded();
       showFoundCircle(17);
       playSfx("snap");
     }
@@ -1683,6 +1759,8 @@
     closeCluePopup(false);
 
     if (!correct) {
+      state.wrongRebuttalCount++;
+      saveState();
       stopBgm();
       playSfx("wrong");
       openDialogue([
@@ -1867,6 +1945,7 @@
     $("dim").classList.add("hidden");
 
     if (!correct) {
+      state.wrongReasoningCount++;
       state.reasoningDraft = reasoningSlots.slice();
       saveState();
       transitionBgm("bgm_game.mp3", 700);
@@ -1888,7 +1967,6 @@
     state.finalTimeMs = state.elapsedMs;
     state.runActive = false;
     state.completed = true;
-    state.pendingNewRound = true;
     saveState();
     showToast("추리 완료!", 3200);
     transitionBgm("bgm_peace.mp3", 700);
@@ -1902,33 +1980,85 @@
     }, 450);
   }
 
-  function formatTime(ms) {
-    const total = Math.max(0, Math.floor(ms / 1000));
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  function formatClearTime(ms) {
+    const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours > 0 ? `${hours}시간 ${minutes}분` : `${totalMinutes}분`;
+  }
+
+  function calculateDeductionScore() {
+    const missingClues = 20 - state.clues.filter(Boolean).length;
+    const score = 100
+      - missingClues * 3
+      - state.wrongRebuttalCount * 7
+      - state.wrongReasoningCount * 9;
+    return Math.max(0, score);
+  }
+
+  function stopClearResultAnimations() {
+    clearRevealTimers.forEach(clearTimeout);
+    clearRevealTimers = [];
+    if (clearScoreRaf !== null) {
+      cancelAnimationFrame(clearScoreRaf);
+      clearScoreRaf = null;
+    }
+  }
+
+  function animateDeductionScore(target, duration = 1800) {
+    const el = $("clearScoreValue");
+    const startedAt = performance.now();
+    el.textContent = "0";
+
+    const tick = (now) => {
+      const t = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 4);
+      el.textContent = String(Math.round(target * eased));
+      if (t < 1) {
+        clearScoreRaf = requestAnimationFrame(tick);
+      } else {
+        clearScoreRaf = null;
+        el.textContent = String(target);
+      }
+    };
+    clearScoreRaf = requestAnimationFrame(tick);
+  }
+
+  function scheduleClearReveal(id, delay, callback) {
+    const timer = setTimeout(() => {
+      $(id).classList.add("show");
+      callback?.();
+    }, delay);
+    clearRevealTimers.push(timer);
   }
 
   function showClearPopup() {
     closeAllPopups();
+    stopClearResultAnimations();
+
     const count = state.clues.filter(Boolean).length;
-    $("clearStats").innerHTML = `
-      <div class="stat-row"><span>클리어 시간</span><strong>${formatTime(state.finalTimeMs)}</strong></div>
-      <div class="stat-row"><span>단서 수집</span><strong>${String(count).padStart(2,"0")} / 20</strong></div>
-    `;
-    $("dim").classList.remove("hidden");
+    const score = calculateDeductionScore();
+    $("clearClueCount").textContent = `단서 수집: ${String(count).padStart(2,"0")} / 20`;
+    $("clearTime").textContent = `클리어 타임: ${formatClearTime(state.finalTimeMs)}`;
+    $("clearScoreValue").textContent = "0";
+    ["clearTitle","clearClueCount","clearTime","clearScoreLabel","clearScore","clearActions"].forEach(id => $(id).classList.remove("show"));
+
     $("clearPopup").classList.remove("hidden");
     playSfx("popup");
 
-    if (count === 20) {
-      state.noirUnlocked = true;
+    scheduleClearReveal("clearTitle", 80);
+    scheduleClearReveal("clearClueCount", 520);
+    scheduleClearReveal("clearTime", 900);
+    scheduleClearReveal("clearScoreLabel", 1380);
+    scheduleClearReveal("clearScore", 1680, () => animateDeductionScore(score));
+    scheduleClearReveal("clearActions", 3600);
+
+    if (count === 20 && !state.strangeHatUnlocked) {
+      state.strangeHatUnlocked = true;
+      state.strangeHatOn = true;
       saveState();
-      setTimeout(() => {
-        showToastSequence([
-          "현장 조사 100% 완료!",
-          "누아르 모드를 해금했습니다."
-        ]);
-      }, 120);
+      applyStrangeHat();
+      setTimeout(() => showToast("이상한 모자를 획득했습니다."), 160);
     }
   }
 
@@ -1955,7 +2085,6 @@
   }
 
   function enterTitleFromInitial() {
-    pendingStartForceNew = true;
     playSfx("confirm");
     pauseBgmForTitleGate();
     fadeToBlack(() => {
@@ -1987,16 +2116,24 @@
   }
 
   function goTitleAfterClear() {
-    if (state.clues.filter(Boolean).length === 20) state.noirOn = true;
     state.completed = true;
     state.runActive = false;
     saveState();
-    applyNoir();
 
     fadeToBlack(() => {
       closeAllPopups();
       setSceneVisible(false);
-      showInitialScreen();
+      $("initialScreen").classList.add("hidden");
+      $("startScreen").classList.remove("hidden");
+      $("startPrompt").classList.remove("hidden");
+      currentMode = "title";
+      clearTimeout(titleBgmTimer);
+      titleBgmTimer = setTimeout(() => {
+        titleBgmTimer = null;
+        if (currentMode === "title" && !$("startScreen").classList.contains("hidden")) {
+          playBgm("bgm_start.mp3");
+        }
+      }, 500);
     });
   }
 
@@ -2007,10 +2144,6 @@
     titleBgmTimer = null;
     fadeToBlack(() => {
       $("startScreen").classList.add("hidden");
-      if (state.pendingNewRound) {
-        state.round++;
-        state.pendingNewRound = false;
-      }
       resetCurrentRun(false);
       state.runActive = true;
       state.completed = false;
@@ -2027,6 +2160,8 @@
     state.clues = Array(20).fill(false);
     state.keywords = ["피해자","범인"];
     state.rebuttalStage = 0;
+    state.wrongRebuttalCount = 0;
+    state.wrongReasoningCount = 0;
     state.windowOpen = false;
     state.noteUpdated = false;
     state.chatUpdated = false;
@@ -2043,7 +2178,7 @@
       startTimer();
       saveState();
       returnToBase();
-      showToast("현재 회차의 진행 상황을 초기화했습니다.");
+      showToast("현재 진행 상황을 초기화했습니다.");
     }
   }
 
@@ -2112,10 +2247,8 @@
   }
 
   function openSettings() {
-    $("roundInfo").classList.toggle("hidden", state.round < 2);
-    $("roundInfo").textContent = `${state.round}회차`;
-    $("noirButton").classList.toggle("hidden", !state.noirUnlocked);
-    applyNoir();
+    $("strangeHatButton").classList.toggle("hidden", !state.strangeHatUnlocked);
+    applyStrangeHat();
     $("dim").classList.remove("hidden");
     $("settingsPopup").classList.remove("hidden");
     playSfx("popup");
@@ -2208,6 +2341,7 @@
   }
 
   function closeAllPopups() {
+    stopClearResultAnimations();
     ["choicePopup","cluePopup","reasoningPopup","settingsPopup","messagePopup","clearPopup"].forEach(id => $(id).classList.add("hidden"));
     $("dim").classList.add("hidden");
     $("characterLayer").classList.add("hidden");
@@ -2292,11 +2426,11 @@
     $("dim").classList.add("hidden");
     showToast(hintText());
   });
-  $("noirButton").addEventListener("click", () => {
+  $("strangeHatButton").addEventListener("click", () => {
     playSfx("confirm");
-    state.noirOn = !state.noirOn;
+    state.strangeHatOn = !state.strangeHatOn;
     saveState();
-    applyNoir();
+    applyStrangeHat();
   });
 
   $("clearConfirm").addEventListener("click", () => { playSfx("confirm"); goTitleAfterClear(); });
@@ -2378,7 +2512,7 @@
   // Initialize
   buildHotspots();
   resizeScene();
-  applyNoir();
+  applyStrangeHat();
   updateMenuBadges();
   updateHotspots();
   showInitialScreen();
