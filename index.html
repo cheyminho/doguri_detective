@@ -1127,7 +1127,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.62</div>
+    <div id="versionLabel">v0.63</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1361,24 +1361,26 @@
     }
   ];
 
-  const finalAnswers = ["피해자","술","혹","깨진 꽃병","사고사","연출","사인","자상","범인","책상","고드름","피해자","창문","열쇠","방문"];
+  // 최종 추리에서는 같은 키워드를 두 번 이상 사용할 수 없다.
+  // 첫 문장의 "피해자"는 고정 문구로 표시하고, "발자국"은 빈칸으로 사용한다.
+  const finalAnswers = ["술","혹","깨진 꽃병","사고사","연출","사인","자상","범인","책상","고드름","피해자","창문","열쇠","발자국","방문"];
   const finalAcceptedAnswers = finalAnswers.map(word => [word]);
-  finalAcceptedAnswers[1] = ["술", "바나나"];
-  finalAcceptedAnswers[3] = ["깨진 꽃병", "술"];
+  finalAcceptedAnswers[0] = ["술", "바나나"];
+  finalAcceptedAnswers[2] = ["깨진 꽃병", "술"];
   const finalTemplate = [
-    ["","는 "," 때문에 넘어진 것이 아니다."],
+    ["피해자는 "," 때문에 넘어진 것이 아니다."],
     ["머리의 ","과 ","은 ","처럼 보이게 하려는 ","이다."],
     ["진짜 ","은 몸에 난 깊고 좁은 ","."],
     ["","은 흉기를 남기지 않기 위해 "," 위에 올라가, 창밖 처마의 ","을 꺾어 ","를 찔렀다."],
     ["그리고 ","을 잠근 뒤, ","를 숨겼다."],
-    ["창밖의 눈에 발자국을 남기지 않기 위해, 잠금 장치를 누른 뒤 ","으로 나갔다."]
+    ["창밖의 눈에 ","을 남기지 않기 위해, 잠금 장치를 누른 뒤 ","으로 나갔다."]
   ];
   const finalSlotMap = [
-    [0,1], [2,3,4,5], [6,7], [8,9,10,11], [12,13], [14]
+    [0], [1,2,3,4], [5,6], [7,8,9,10], [11,12], [13,14]
   ];
 
   const defaultState = () => ({
-    version: 3,
+    version: 4,
     runActive: false,
     completed: false,
     clues: Array(20).fill(false),
@@ -1536,6 +1538,7 @@
       if (!raw) return defaultState();
       const parsed = JSON.parse(raw);
       const base = defaultState();
+      const reasoningSchemaChanged = parsed.version !== base.version;
       const merged = Object.fromEntries(
         Object.keys(base).map(key => [key, Object.prototype.hasOwnProperty.call(parsed, key) ? parsed[key] : base[key]])
       );
@@ -1546,7 +1549,8 @@
       }
       merged.hintUseCount = Math.max(0, Number(merged.hintUseCount) || 0);
       if (!Array.isArray(merged.keywords)) merged.keywords = ["피해자","범인"];
-      if (!Array.isArray(merged.reasoningDraft) || merged.reasoningDraft.length !== finalAnswers.length) {
+      // 정답 빈칸 구조가 바뀐 버전에서는 이전 위치의 임시 배치를 불러오지 않는다.
+      if (reasoningSchemaChanged || !Array.isArray(merged.reasoningDraft) || merged.reasoningDraft.length !== finalAnswers.length) {
         merged.reasoningDraft = Array(finalAnswers.length).fill("");
       }
       merged.wrongRebuttalCount = Math.max(0, Number(merged.wrongRebuttalCount) || 0);
@@ -2349,12 +2353,12 @@
     container.innerHTML = "";
 
     const lines = [
-      [0, "는 ", 1, " 때문에 넘어진 것이 아니다."],
-      ["머리의 ", 2, "과 ", 3, "은 ", 4, "처럼 보이게 하려는 ", 5, "이다."],
-      ["진짜 ", 6, "은 몸에 난 깊고 좁은 ", 7, "."],
-      [8, "은 흉기를 남기지 않기 위해 ", 9, " 위에 올라가, 창밖 처마의 ", 10, "을 꺾어 ", 11, "를 찔렀다."],
-      ["그리고 ", 12, "을 잠근 뒤, ", 13, "를 숨겼다."],
-      ["창밖의 눈에 발자국을 남기지 않기 위해, 잠금 장치를 누른 뒤 ", 14, "으로 나갔다."]
+      ["피해자는 ", 0, " 때문에 넘어진 것이 아니다."],
+      ["머리의 ", 1, "과 ", 2, "은 ", 3, "처럼 보이게 하려는 ", 4, "이다."],
+      ["진짜 ", 5, "은 몸에 난 깊고 좁은 ", 6, "."],
+      [7, "은 흉기를 남기지 않기 위해 ", 8, " 위에 올라가, 창밖 처마의 ", 9, "을 꺾어 ", 10, "를 찔렀다."],
+      ["그리고 ", 11, "을 잠근 뒤, ", 12, "를 숨겼다."],
+      ["창밖의 눈에 ", 13, "을 남기지 않기 위해, 잠금 장치를 누른 뒤 ", 14, "으로 나갔다."]
     ];
 
     lines.forEach(parts => {
@@ -2369,20 +2373,11 @@
     const bank = $("keywordBank");
     bank.innerHTML = "";
 
-    const usedKeywordCount = reasoningSlots.reduce((counts, word) => {
-      if (word) counts[word] = (counts[word] || 0) + 1;
-      return counts;
-    }, {});
-    const requiredKeywordCount = finalAcceptedAnswers.reduce((counts, options) => {
-      options.forEach(word => {
-        counts[word] = (counts[word] || 0) + 1;
-      });
-      return counts;
-    }, {});
+    // 한 키워드는 한 번만 사용한다. 빈칸에 배치된 즉시 하단 키워드 목록에서 사라진다.
+    const usedKeywords = new Set(reasoningSlots.filter(Boolean));
 
     getSortedKeywords(state.keywords).forEach(word => {
-      const availableCount = Math.max(1, requiredKeywordCount[word] || 0) - (usedKeywordCount[word] || 0);
-      if (availableCount <= 0) return;
+      if (usedKeywords.has(word)) return;
 
       const chip = document.createElement("button");
       chip.className = "keyword-chip";
@@ -2423,8 +2418,13 @@
     }
   }
 
+  function hasUniqueReasoningKeywords() {
+    const filled = reasoningSlots.filter(Boolean);
+    return new Set(filled).size === filled.length;
+  }
+
   function updateReasoningConfirmState() {
-    $("reasoningConfirm").disabled = !reasoningSlots.every(Boolean);
+    $("reasoningConfirm").disabled = !reasoningSlots.every(Boolean) || !hasUniqueReasoningKeywords();
   }
 
   function makeSlot(idx) {
@@ -2469,7 +2469,7 @@
   }
 
   function submitReasoning() {
-    if (!reasoningSlots.every(Boolean)) return;
+    if (!reasoningSlots.every(Boolean) || !hasUniqueReasoningKeywords()) return;
     const correct = finalAcceptedAnswers.every((options, i) => options.includes(reasoningSlots[i]));
     $("reasoningPopup").classList.add("hidden");
     $("dim").classList.add("hidden");
@@ -3011,9 +3011,55 @@
   }
   function closeMessage() { $("messagePopup").classList.add("hidden"); }
 
+  function getFinalAssignmentCapacity(words = []) {
+    const availableWords = new Set(words);
+    const slotOptions = finalAcceptedAnswers.map(options => options.filter(word => availableWords.has(word)));
+    const matchedWordToSlot = new Map();
+
+    function tryAssign(slotIndex, seenWords) {
+      for (const word of slotOptions[slotIndex]) {
+        if (seenWords.has(word)) continue;
+        seenWords.add(word);
+
+        const previousSlot = matchedWordToSlot.get(word);
+        if (previousSlot === undefined || tryAssign(previousSlot, seenWords)) {
+          matchedWordToSlot.set(word, slotIndex);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    let matchedCount = 0;
+    const slotOrder = slotOptions
+      .map((options, slotIndex) => ({slotIndex, optionCount: options.length}))
+      .sort((a, b) => a.optionCount - b.optionCount);
+
+    slotOrder.forEach(({slotIndex}) => {
+      if (tryAssign(slotIndex, new Set())) matchedCount++;
+    });
+    return matchedCount;
+  }
+
+  function canFillFinalReasoningWithKeywords(words = []) {
+    return getFinalAssignmentCapacity(words) === finalAcceptedAnswers.length;
+  }
+
+  function getHelpfulMissingFinalWords(words = []) {
+    const available = [...new Set(words)];
+    const availableSet = new Set(available);
+    const currentCapacity = getFinalAssignmentCapacity(available);
+    const allAcceptedWords = [...new Set(finalAcceptedAnswers.flat())];
+
+    return allAcceptedWords.filter(word =>
+      !availableSet.has(word) &&
+      getFinalAssignmentCapacity([...available, word]) > currentCapacity
+    );
+  }
+
   function hintText() {
     if (state.rebuttalStage >= 5) {
-      const complete = finalAcceptedAnswers.every(options => options.some(word => state.keywords.includes(word)));
+      const complete = canFillFinalReasoningWithKeywords(state.keywords);
       return complete ? "단서는 이제 충분합니다." : "아직 단서가 부족합니다.";
     }
     const correct = rebuttals[state.rebuttalStage].correct;
@@ -3035,11 +3081,7 @@
     }
 
     if (candidates.length === 0 && state.rebuttalStage >= rebuttals.length) {
-      const missingFinalWords = new Set(
-        finalAcceptedAnswers
-          .filter(options => !options.some(word => state.keywords.includes(word)))
-          .flat()
-      );
+      const missingFinalWords = new Set(getHelpfulMissingFinalWords(state.keywords));
       candidates = hiddenMissing.filter(idx =>
         clueData[idx].keywords.some(keyword => missingFinalWords.has(keyword))
       );
