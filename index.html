@@ -378,8 +378,8 @@
   .icon-wrap { position: relative; }
   .update-badge {
     position: absolute;
-    top: -16px;
-    right: -4px;
+    top: -12px;
+    right: -2px;
     z-index: 4;
     width: clamp(36px, 4vw, 64px);
     height: clamp(36px, 4vw, 64px);
@@ -450,7 +450,7 @@
   }
   .character {
     position: absolute;
-    bottom: 30;
+    bottom: 30px;
     width: min(82vh, 920px);
     height: min(98vh, 1080px);
     object-fit: contain;
@@ -569,7 +569,8 @@
     top: max(7vh, calc(env(safe-area-inset-top) + 22px));
     z-index: 90;
     transform: translateX(-50%) scale(.88);
-    max-width: min(90vw, 820px);
+    width: max-content;
+    max-width: calc(100vw - 20px);
     padding: 14px 24px;
     border-radius: 18px;
     background: rgba(255,255,255,.96);
@@ -577,6 +578,7 @@
     font-size: clamp(18px, 2vw, 28px);
     font-weight: 800;
     text-align: center;
+    white-space: nowrap;
     opacity: 0;
     pointer-events: none;
     transform-origin: center center;
@@ -956,15 +958,24 @@
   /* Mobile */
   @media (max-width: 700px) {
     #startTitle { width: 78vw; top: 5vh; }
+
+    /* 타이틀 화면 도구리 - 모바일 전용 크기 / 위치 */
+    #startDoguri {
+      width: 72vh;   /* 가로 크기 */
+      height: 82vh;  /* 세로 크기 */
+      left: 50%;     /* 좌우 위치: 값이 작을수록 왼쪽, 클수록 오른쪽 */
+      top: 60%;      /* 상하 위치: 값이 작을수록 위, 클수록 아래 */
+    }
+
     #startPrompt { font-size: 24px; bottom: max(8vh, calc(env(safe-area-inset-bottom) + 12px)); }
     .popup { width: 88vw; padding: 20px; border-radius: 20px; }
     #clueGrid { gap: 0; }
     .clue-cell { border-radius: 0; }
     #dialogueBox { min-height: calc(180px + clamp(22px, 3vh, 40px) + 24px); padding-left: 22px; padding-right: 22px; }
-    .character { width: 88vw; height: 78vh; }
-    #mungCenter { bottom: -20px; }
-    #doguriLeft { left: -12vw; bottom: 90px; }
-    #mungRight { right: -14vw; bottom: 70px; }
+    .character { width: 100vw; height: 100vh; }
+    #mungCenter { top: auto; bottom: 88px; }
+    #doguriLeft { top: auto; left: -12vw; bottom: 110px; width: 88vw; height: 78vh; }
+    #mungRight { top: auto; right: -16vw; bottom: 70px; width: 100vw; height: 78vh; }
     #bottomBar { gap: 12px; }
     .icon-btn { width: 70px; height: 70px; }
     .blank-slot { min-width: 62px; height: 38px; padding: 0 4px; }
@@ -1004,7 +1015,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.5</div>
+    <div id="versionLabel">v0.51</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1243,10 +1254,12 @@
   ];
 
   const defaultState = () => ({
-    version: 2,
+    version: 3,
     runActive: false,
     completed: false,
     clues: Array(20).fill(false),
+    hintRevealedClues: Array(20).fill(false),
+    hintUseCount: 0,
     keywords: ["피해자","범인"],
     rebuttalStage: 0,
     wrongRebuttalCount: 0,
@@ -1401,6 +1414,10 @@
       );
       merged.version = base.version;
       if (!Array.isArray(merged.clues) || merged.clues.length !== 20) merged.clues = Array(20).fill(false);
+      if (!Array.isArray(merged.hintRevealedClues) || merged.hintRevealedClues.length !== 20) {
+        merged.hintRevealedClues = Array(20).fill(false);
+      }
+      merged.hintUseCount = Math.max(0, Number(merged.hintUseCount) || 0);
       if (!Array.isArray(merged.keywords)) merged.keywords = ["피해자","범인"];
       if (!Array.isArray(merged.reasoningDraft) || merged.reasoningDraft.length !== finalAnswers.length) {
         merged.reasoningDraft = Array(finalAnswers.length).fill("");
@@ -1452,11 +1469,32 @@
     }, 700);
   }
 
+  function fitToastToViewport(el) {
+    el.style.fontSize = "";
+    el.style.paddingLeft = "";
+    el.style.paddingRight = "";
+
+    const availableWidth = Math.max(120, innerWidth - 20);
+    const naturalWidth = el.scrollWidth;
+    if (naturalWidth <= availableWidth) return;
+
+    const computed = getComputedStyle(el);
+    const baseFontSize = parseFloat(computed.fontSize) || 18;
+    const basePaddingLeft = parseFloat(computed.paddingLeft) || 0;
+    const basePaddingRight = parseFloat(computed.paddingRight) || 0;
+    const scale = Math.max(0.55, availableWidth / naturalWidth);
+
+    el.style.fontSize = `${Math.max(11, baseFontSize * scale)}px`;
+    el.style.paddingLeft = `${Math.max(8, basePaddingLeft * scale)}px`;
+    el.style.paddingRight = `${Math.max(8, basePaddingRight * scale)}px`;
+  }
+
   function showToast(text, duration=2600, playToastSound=true, showAboveTitle=false) {
     clearTimeout(toastTimer);
     if (playToastSound) playSfx("toast");
     const el = $("toast");
     el.textContent = text;
+    fitToastToViewport(el);
     el.classList.toggle("title-toast", showAboveTitle);
     el.classList.add("show");
     toastTimer = setTimeout(() => {
@@ -1475,11 +1513,11 @@
 
   function notifyClueAcquired(idx) {
     const clue = clueData[idx];
-    const quoted = clue.keywords.map(k => `「${k}」`).join(",");
+    const quoted = clue.keywords.map(k => `「${k}」`).join(", ");
     const lastKeyword = clue.keywords.at(-1) || "";
     const particle = hasFinalConsonant(lastKeyword) ? "을" : "를";
     playSfx("found");
-    showToast(`키워드${quoted}${particle} 획득했습니다.`, 2600, false);
+    showToast(`키워드 ${quoted}${particle} 획득했습니다.`, 2600, false);
   }
 
   function notifyInvestigationCompleteIfNeeded() {
@@ -1870,7 +1908,12 @@
       sprite.className = "clue-sprite";
       const col = idx % 5;
       const row = Math.floor(idx / 5);
-      sprite.style.backgroundImage = `url("images/${state.clues[idx] ? "clues_on.png" : "clues_off.png"}")`;
+      const spriteFile = state.clues[idx]
+        ? "clues_on.png"
+        : state.hintRevealedClues[idx]
+          ? "clues_off.png"
+          : "clues_hidden.png";
+      sprite.style.backgroundImage = `url("images/${spriteFile}")`;
       sprite.style.backgroundPosition = `${col*25}% ${row*25}%`;
       const frame = document.createElement("span");
       frame.className = "clue-frame";
@@ -2192,7 +2235,8 @@
     const score = 100
       - missingClues * 3
       - state.wrongRebuttalCount * 7
-      - state.wrongReasoningCount * 9;
+      - state.wrongReasoningCount * 9
+      - state.hintUseCount;
     return Math.max(0, score);
   }
 
@@ -2516,6 +2560,8 @@
     state.runActive = false;
     state.completed = false;
     state.clues = Array(20).fill(false);
+    state.hintRevealedClues = Array(20).fill(false);
+    state.hintUseCount = 0;
     state.keywords = ["피해자","범인"];
     state.rebuttalStage = 0;
     state.wrongRebuttalCount = 0;
@@ -2659,6 +2705,43 @@
     const correct = rebuttals[state.rebuttalStage].correct;
     const acquired = correct.find(idx => state.clues[idx]);
     return acquired === undefined ? "현장을 조사하세요." : "필요한 단서가 이미 있습니다.";
+  }
+
+  function revealOneHiddenClueName() {
+    const hiddenMissing = clueData
+      .map((_, idx) => idx)
+      .filter(idx => !state.clues[idx] && !state.hintRevealedClues[idx]);
+
+    if (hiddenMissing.length === 0) return null;
+
+    let candidates = [];
+    if (state.rebuttalStage < rebuttals.length) {
+      candidates = rebuttals[state.rebuttalStage].correct
+        .filter(idx => hiddenMissing.includes(idx));
+    }
+
+    if (candidates.length === 0 && state.rebuttalStage >= rebuttals.length) {
+      const missingFinalWords = new Set(
+        finalAcceptedAnswers
+          .filter(options => !options.some(word => state.keywords.includes(word)))
+          .flat()
+      );
+      candidates = hiddenMissing.filter(idx =>
+        clueData[idx].keywords.some(keyword => missingFinalWords.has(keyword))
+      );
+    }
+
+    const pool = candidates.length > 0 ? candidates : hiddenMissing;
+    const idx = pool[Math.floor(Math.random() * pool.length)];
+    state.hintRevealedClues[idx] = true;
+    return idx;
+  }
+
+  function useHint() {
+    state.hintUseCount++;
+    revealOneHiddenClueName();
+    saveState();
+    showToast(hintText(), 2600, false);
   }
 
   function isVisible(id) {
@@ -2830,7 +2913,7 @@
   });
   $("hintMainButton").addEventListener("click", () => {
     playSfx("confirm");
-    showToast(hintText(), 2600, false);
+    useHint();
   });
   $("strangeHatButton").addEventListener("click", () => {
     playSfx("confirm");
