@@ -444,11 +444,11 @@
   .icon-wrap { position: relative; }
   .update-badge {
     position: absolute;
-    top: -18px;
-    right: -10px;
+    top: -17%;
+    right: -9.5%;
     z-index: 4;
-    width: clamp(36px, 4vw, 64px);
-    height: clamp(36px, 4vw, 64px);
+    width: 60%;
+    height: 60%;
     object-fit: contain;
     pointer-events: none;
   }
@@ -980,6 +980,7 @@
   }
   #clearCommentBubble {
     position: relative;
+    min-width: 0;
     max-width: min(72vw, 560px);
     padding: clamp(11px, 1.5vw, 16px) clamp(16px, 2vw, 24px);
     border-radius: clamp(15px, 2vw, 22px);
@@ -1122,7 +1123,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.6</div>
+    <div id="versionLabel">v0.61</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -2617,6 +2618,30 @@
     return "…사건은 해결됐으니, 자세한 건 묻지 맙시다.";
   }
 
+  function fitClearCommentToBubble() {
+    const bubble = $("clearCommentBubble");
+    const text = $("clearCommentText");
+    if (!bubble || !text || isVisible("clearPopup") === false) return;
+
+    // 먼저 기본 글자 크기로 되돌린 뒤, 현재 말풍선의 실제 안쪽 폭에 맞춰 축소한다.
+    bubble.style.fontSize = "";
+
+    const computed = getComputedStyle(bubble);
+    const baseFontSize = parseFloat(computed.fontSize) || 18;
+    const paddingLeft = parseFloat(computed.paddingLeft) || 0;
+    const paddingRight = parseFloat(computed.paddingRight) || 0;
+    const availableWidth = Math.max(1, bubble.clientWidth - paddingLeft - paddingRight);
+
+    for (let i = 0; i < 5; i++) {
+      const textWidth = Math.max(text.scrollWidth, text.getBoundingClientRect().width);
+      if (textWidth <= availableWidth + 0.5) break;
+
+      const currentFontSize = parseFloat(getComputedStyle(bubble).fontSize) || baseFontSize;
+      const nextFontSize = Math.max(8, currentFontSize * (availableWidth / textWidth) * 0.98);
+      bubble.style.fontSize = `${nextFontSize}px`;
+    }
+  }
+
   function updateClearInfoScale() {
     const scaleWrap = $("clearInfoScale");
     const group = $("clearInfoGroup");
@@ -2656,6 +2681,7 @@
     ["clearTitle","clearClueCount","clearTime","clearScoreLabel","clearScore","clearCommentRow","clearActions"].forEach(id => $(id).classList.remove("show"));
 
     $("clearPopup").classList.remove("hidden");
+    fitClearCommentToBubble();
     updateClearInfoScale();
     playClearConfetti();
     playSfx("applause");
@@ -3313,6 +3339,7 @@
   });
 
   window.addEventListener("resize", resizeScene);
+  window.addEventListener("resize", fitClearCommentToBubble);
   window.addEventListener("resize", updateClearInfoScale);
   window.addEventListener("resize", fitReasoningContentToViewport);
   window.addEventListener("resize", syncStartSubtitleToTitleImage);
