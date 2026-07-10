@@ -16,14 +16,32 @@
     --radius: 24px;
   }
 
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; }
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: #000;
+    touch-action: none;
+    overscroll-behavior: none;
+  }
   body {
     font-family: Arial, "Noto Sans KR", sans-serif;
     color: #fff;
-    user-select: none;
     touch-action: none;
     cursor: url("images/cursor_default.png") 64 64, auto;
+  }
+  img {
+    -webkit-user-drag: none;
+    user-drag: none;
+    -webkit-touch-callout: none;
   }
   #app, #app * {
     cursor: url("images/cursor_default.png") 64 64, auto;
@@ -1035,7 +1053,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.53</div>
+    <div id="versionLabel">v0.54</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -3022,8 +3040,22 @@
   document.addEventListener("visibilitychange", () => { if (document.hidden) saveState(); });
   setInterval(() => { if (state.runActive) saveState(); }, 10000);
 
-  // Prevent browser zoom gestures.
-  document.addEventListener("gesturestart", e => e.preventDefault(), {passive:false});
+  // Prevent browser zoom gestures, long-press selection, and image dragging on mobile.
+  const preventBrowserGesture = (e) => e.preventDefault();
+  ["gesturestart", "gesturechange", "gestureend"].forEach(type => {
+    document.addEventListener(type, preventBrowserGesture, {passive:false});
+  });
+  document.addEventListener("touchstart", e => {
+    if (e.touches.length > 1) e.preventDefault();
+  }, {passive:false});
+  document.addEventListener("touchmove", e => {
+    if (e.touches.length > 1) e.preventDefault();
+  }, {passive:false});
+  document.addEventListener("selectstart", e => e.preventDefault());
+  document.addEventListener("contextmenu", e => e.preventDefault());
+  document.addEventListener("dragstart", e => {
+    if (e.target instanceof HTMLImageElement) e.preventDefault();
+  });
   document.addEventListener("dblclick", e => e.preventDefault(), {passive:false});
   document.addEventListener("wheel", e => {
     if (e.ctrlKey) e.preventDefault();
