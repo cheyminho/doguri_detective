@@ -1012,6 +1012,10 @@
   #clearActions {
     margin-top: auto;
     margin-bottom: clamp(26px, 6vh, 68px);
+    pointer-events: none;
+  }
+  #clearActions.show {
+    pointer-events: auto;
   }
   #clearConfirm {
     min-width: min(54vw, 195px);
@@ -1123,7 +1127,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.61</div>
+    <div id="versionLabel">v0.62</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -2679,6 +2683,7 @@
     $("clearScoreValue").style.color = score >= 90 ? "#f79f92" : "#e2a559";
     $("clearCommentText").textContent = getClearComment(score);
     ["clearTitle","clearClueCount","clearTime","clearScoreLabel","clearScore","clearCommentRow","clearActions"].forEach(id => $(id).classList.remove("show"));
+    $("clearConfirm").disabled = true;
 
     $("clearPopup").classList.remove("hidden");
     fitClearCommentToBubble();
@@ -2693,7 +2698,9 @@
     scheduleClearReveal("clearScoreLabel", 1380);
     scheduleClearReveal("clearScore", 1680, () => animateDeductionScore(score));
     scheduleClearReveal("clearCommentRow", 4500);
-    scheduleClearReveal("clearActions", 5200);
+    scheduleClearReveal("clearActions", 5200, () => {
+      $("clearConfirm").disabled = false;
+    });
 
     if (count === 20 && !state.strangeHatUnlocked) {
       state.strangeHatUnlocked = true;
@@ -3274,7 +3281,11 @@
     applyStrangeHat();
   });
 
-  $("clearConfirm").addEventListener("click", () => { playSfx("confirm"); goTitleAfterClear(); });
+  $("clearConfirm").addEventListener("click", () => {
+    if ($("clearConfirm").disabled || !$("clearActions").classList.contains("show")) return;
+    playSfx("confirm");
+    goTitleAfterClear();
+  });
 
   window.addEventListener("keydown", (e) => {
     if (e.code !== "Space") return;
