@@ -58,22 +58,25 @@
     user-drag: none;
     -webkit-touch-callout: none;
   }
+  /* 게임 영역에서는 브라우저 시스템 커서가 노출되지 않도록 게임 커서를 강제한다. */
   #app, #app * {
-    cursor: url("images/cursor_default.png") 64 64, auto;
+    cursor: url("images/cursor_default.png") 64 64, auto !important;
   }
   #sceneViewport.cursor-investigate,
   #sceneViewport.cursor-investigate * {
-    cursor: url("images/cursor_investigate.png") 64 64, auto;
+    cursor: url("images/cursor_investigate.png") 64 64, auto !important;
   }
   #sceneViewport.cursor-drag,
   #sceneViewport.cursor-drag * {
-    cursor: url("images/cursor_drag.png") 64 64, auto;
+    cursor: url("images/cursor_drag.png") 64 64, auto !important;
   }
 
-  /* 기본 커서 영역을 누르고 있는 동안 드래그 커서 표시 */
+  /* 기본 커서 영역을 누르거나 키워드를 드래그하는 동안 드래그 커서 표시 */
   #app.cursor-pressed,
-  #app.cursor-pressed * {
-    cursor: url("images/cursor_drag.png") 64 64, auto;
+  #app.cursor-pressed *,
+  #app.keyword-dragging,
+  #app.keyword-dragging * {
+    cursor: url("images/cursor_drag.png") 64 64, auto !important;
   }
   button, input { font: inherit; }
   button {
@@ -1133,7 +1136,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.64</div>
+    <div id="versionLabel">v0.65</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -2285,10 +2288,8 @@
   }
 
   function startKeywordPointerDrag(e, chip, word) {
-    // PC 마우스는 기존 HTML5 drag/drop을 사용하고,
-    // 모바일 터치와 펜 입력만 Pointer Events로 직접 처리한다.
-    if (e.pointerType === "mouse") return;
-
+    // PC/모바일 모두 Pointer Events 기반의 게임 내부 드래그를 사용한다.
+    // 브라우저 기본 HTML5 drag/drop을 쓰지 않아 시스템 커서가 나타나지 않는다.
     keywordPointerDrag = {
       pointerId: e.pointerId,
       chip,
@@ -2312,6 +2313,7 @@
     if (!dragInfo.moved) {
       dragInfo.moved = true;
       suppressKeywordClick = true;
+      $("app").classList.add("keyword-dragging");
       selectedKeyword = dragInfo.word;
       updateKeywordSelection();
       dragInfo.preview = createKeywordDragPreview(dragInfo.chip);
@@ -2328,6 +2330,7 @@
 
     keywordPointerDrag = null;
     dragInfo.preview?.remove();
+    $("app").classList.remove("keyword-dragging");
 
     if (dragInfo.moved) {
       e.preventDefault();
@@ -2388,27 +2391,8 @@
       const chip = document.createElement("button");
       chip.className = "keyword-chip";
       chip.textContent = word;
-      chip.draggable = true;
+      chip.draggable = false;
       chip.addEventListener("pointerdown", (e) => startKeywordPointerDrag(e, chip, word));
-      chip.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("text/plain", word);
-        selectedKeyword = word;
-        updateKeywordSelection();
-
-        const preview = document.createElement("div");
-        preview.className = "keyword-drag-preview";
-        const previewChip = chip.cloneNode(true);
-        previewChip.classList.add("selected");
-        preview.appendChild(previewChip);
-        document.body.appendChild(preview);
-
-        e.dataTransfer.setDragImage(
-          preview,
-          preview.offsetWidth / 2,
-          preview.offsetHeight / 2
-        );
-        setTimeout(() => preview.remove(), 0);
-      });
       chip.addEventListener("click", () => {
         if (suppressKeywordClick) return;
         playSfx("flick");
@@ -2448,16 +2432,6 @@
         reasoningSlots[idx] = "";
         renderReasoning();
       }
-    });
-    slot.addEventListener("dragover", e => {
-      e.preventDefault();
-    });
-    slot.addEventListener("drop", e => {
-      e.preventDefault();
-      reasoningSlots[idx] = e.dataTransfer.getData("text/plain");
-      selectedKeyword = null;
-      playSfx("flick");
-      renderReasoning();
     });
     return slot;
   }
@@ -3344,7 +3318,7 @@
   window.addEventListener("blur", () => {
     clearTimeout(pressCursorReleaseTimer);
     pressCursorReleaseTimer = null;
-    $("app").classList.remove("cursor-pressed");
+    $("app").classList.remove("cursor-pressed", "keyword-dragging");
   });
 
   $("titleButton").addEventListener("click", () => { playSfx("confirm"); goTitleFromSettings(); });
