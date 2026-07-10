@@ -69,6 +69,12 @@
   #sceneViewport.cursor-drag * {
     cursor: url("images/cursor_drag.png") 64 64, auto;
   }
+
+  /* 기본 커서 영역을 누르고 있는 동안 드래그 커서 표시 */
+  #app.cursor-pressed,
+  #app.cursor-pressed * {
+    cursor: url("images/cursor_drag.png") 64 64, auto;
+  }
   button, input { font: inherit; }
   button {
     border: 0;
@@ -1127,7 +1133,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.63</div>
+    <div id="versionLabel">v0.64</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -3303,6 +3309,43 @@
   document.addEventListener("pointermove", moveKeywordPointerDrag, {passive:false});
   document.addEventListener("pointerup", e => finishKeywordPointerDrag(e, false), {passive:false});
   document.addEventListener("pointercancel", e => finishKeywordPointerDrag(e, true), {passive:false});
+
+  // 기본 커서 영역은 누르는 순간 드래그 커서로 바뀐다.
+  // 아주 짧은 클릭도 보이도록 최소 표시 시간을 둔다.
+  const PRESS_CURSOR_MIN_MS = 90;
+  let pressCursorStartedAt = 0;
+  let pressCursorReleaseTimer = null;
+
+  function showPressedCursor(e) {
+    if (e.pointerType === "touch") return;
+    if (e.target.closest?.("#sceneViewport.cursor-investigate")) return;
+
+    clearTimeout(pressCursorReleaseTimer);
+    pressCursorReleaseTimer = null;
+    pressCursorStartedAt = performance.now();
+    $("app").classList.add("cursor-pressed");
+  }
+
+  function hidePressedCursor() {
+    if (!$("app").classList.contains("cursor-pressed")) return;
+
+    const elapsed = performance.now() - pressCursorStartedAt;
+    const delay = Math.max(0, PRESS_CURSOR_MIN_MS - elapsed);
+    clearTimeout(pressCursorReleaseTimer);
+    pressCursorReleaseTimer = setTimeout(() => {
+      $("app").classList.remove("cursor-pressed");
+      pressCursorReleaseTimer = null;
+    }, delay);
+  }
+
+  document.addEventListener("pointerdown", showPressedCursor, true);
+  document.addEventListener("pointerup", hidePressedCursor, true);
+  document.addEventListener("pointercancel", hidePressedCursor, true);
+  window.addEventListener("blur", () => {
+    clearTimeout(pressCursorReleaseTimer);
+    pressCursorReleaseTimer = null;
+    $("app").classList.remove("cursor-pressed");
+  });
 
   $("titleButton").addEventListener("click", () => { playSfx("confirm"); goTitleFromSettings(); });
   $("settingsNewGameButton").addEventListener("click", () => {
