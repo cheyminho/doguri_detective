@@ -976,6 +976,18 @@
       white-space: nowrap;
     }
 
+    /* 처음부터 시작 확인 팝업 - 모바일에서 가로 폭을 넓게 사용 */
+    #newGameConfirmPopup {
+      width: calc(100vw - 8px);
+      max-width: none;
+      padding: 24px 8px;
+    }
+    #newGameConfirmPopup p {
+      font-size: clamp(14px, 4.2vw, 20px);
+      letter-spacing: -0.03em;
+      white-space: nowrap;
+    }
+
     .popup { width: 88vw; padding: 20px; border-radius: 20px; }
     #clueGrid { gap: 0; }
     .clue-cell { border-radius: 0; }
@@ -1023,7 +1035,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.52</div>
+    <div id="versionLabel">v0.53</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1317,6 +1329,8 @@
   let testModeEnabled = false;
   let testModeScore = 100;
   let newGameConfirmFromSettings = false;
+  let windowVisualDelayActive = false;
+  let windowClosedHideTimer = null;
 
   const audio = {
     bgm: new Audio(),
@@ -1635,7 +1649,7 @@
       el.style.pointerEvents = active ? "auto" : "none";
       el.style.zIndex = idx === 0 && state.windowOpen ? "2" : "1";
     });
-    $("windowClosed").classList.toggle("hidden", state.windowOpen);
+    $("windowClosed").classList.toggle("hidden", state.windowOpen && !windowVisualDelayActive);
     if (state.windowOpen) scheduleBird();
     else stopBird();
     updatePanArrows();
@@ -1716,11 +1730,18 @@
         {speaker:"도구리", text:"열쇠가 맞네.", thought:true},
         {speaker:"도구리", text:"누군가 일부러 창문을 잠근 건가…?", thought:true}
       ], { mode:"first", onComplete:() => {
-        setTimeout(() => playSfx("windowopen"), 1000);
+        playSfx("windowopen");
+        windowVisualDelayActive = true;
+        clearTimeout(windowClosedHideTimer);
         state.windowOpen = true;
         saveState();
         updateHotspots();
         setMode("investigate");
+        windowClosedHideTimer = setTimeout(() => {
+          windowVisualDelayActive = false;
+          windowClosedHideTimer = null;
+          updateHotspots();
+        }, 250);
         if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17);
       }});
     } else {
@@ -1749,7 +1770,7 @@
     birdTimeout = setTimeout(() => {
       birdTimeout = null;
       runBirdSequence();
-    }, 6000);
+    }, 60000);
   }
 
   function setBirdFrame(frame) {
