@@ -758,6 +758,14 @@
     background: transparent;
     border-radius: 0;
   }
+  #reasoningContentViewport {
+    width: 100%;
+    overflow: visible;
+  }
+  #reasoningContent {
+    width: 100%;
+    transform-origin: top center;
+  }
   #reasoningText {
     font-size: clamp(17px, 1.7vw, 25px);
     line-height: 2.15;
@@ -1050,6 +1058,11 @@
     #bottomBar { gap: 12px; }
     .icon-btn { width: 70px; height: 70px; }
     .blank-slot { min-width: 62px; height: 38px; padding: 0 4px; }
+    #reasoningPopup {
+      width: 96vw;
+      max-height: 96dvh;
+      padding: 12px;
+    }
     #reasoningText { line-height: 2.3; }
   }
 </style>
@@ -1086,7 +1099,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.57</div>
+    <div id="versionLabel">v0.58</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1184,8 +1197,12 @@
   </div>
 
   <div id="reasoningPopup" class="popup hidden">
-    <div id="reasoningText"></div>
-    <div id="keywordBank"></div>
+    <div id="reasoningContentViewport">
+      <div id="reasoningContent">
+        <div id="reasoningText"></div>
+        <div id="keywordBank"></div>
+      </div>
+    </div>
     <div class="popup-actions">
       <button id="reasoningCancel" class="action-btn">취소</button>
       <button id="reasoningConfirm" class="action-btn">확인</button>
@@ -1363,7 +1380,6 @@
   let dialogueLocked = false;
   let toastTimer = null;
   let pendingStrangeHatAcquireToast = false;
-  let investigationCompleteToastUntil = 0;
   let clearRevealTimers = [];
   let clearScoreRaf = null;
   let clearConfettiTimer = null;
@@ -1604,15 +1620,24 @@
   function notifyInvestigationCompleteIfNeeded() {
     if (state.clues.filter(Boolean).length !== 20) return;
     const duration = 2600;
-    investigationCompleteToastUntil = performance.now() + duration;
     playSfx("correct");
     showToast("현장 조사 100% 완료!", duration, false);
   }
 
-  function notifyClueAcquiredDelayed(idx) {
-    const remaining = investigationCompleteToastUntil - performance.now();
-    const delay = Math.max(250, remaining > 0 ? remaining + 220 : 250);
-    setTimeout(() => notifyClueAcquired(idx), delay);
+  function notifyClueAcquiredDelayed(idx, showInvestigationCompleteAfter = false) {
+    const delay = 250;
+    const clueToastDuration = 2600;
+    const nextToastGap = 220;
+
+    setTimeout(() => {
+      notifyClueAcquired(idx);
+
+      if (showInvestigationCompleteAfter) {
+        setTimeout(() => {
+          notifyInvestigationCompleteIfNeeded();
+        }, clueToastDuration + nextToastGap);
+      }
+    }, delay);
   }
 
   function updateMenuBadges() {
@@ -1742,9 +1767,9 @@
       if (!state.keywords.includes(k)) state.keywords.push(k);
     });
     state.noteUpdated = true;
+    const completedInvestigation = state.clues.every(Boolean);
     saveState();
     updateMenuBadges();
-    notifyInvestigationCompleteIfNeeded();
 
     playSfx("snap");
     showFoundCircle(idx);
@@ -1756,7 +1781,7 @@
     openDialogue(entries, { mode:"first", onComplete:() => {
       if (idx === 12 && !state.windowOpen) updateHotspots();
       setMode("investigate");
-      notifyClueAcquiredDelayed(idx);
+      notifyClueAcquiredDelayed(idx, completedInvestigation);
     }});
   }
 
@@ -1773,13 +1798,14 @@
   function handleWindow() {
     const hasKey = state.clues[12];
     const newlyAcquiredWindow = !state.clues[17];
+    let completedInvestigation = false;
     if (newlyAcquiredWindow) {
       state.clues[17] = true;
       if (!state.keywords.includes("창문")) state.keywords.push("창문");
       state.noteUpdated = true;
+      completedInvestigation = state.clues.every(Boolean);
       saveState();
       updateMenuBadges();
-      notifyInvestigationCompleteIfNeeded();
       showFoundCircle(17);
       playSfx("snap");
     }
@@ -1801,7 +1827,7 @@
           windowClosedHideTimer = null;
           updateHotspots();
         }, 250);
-        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17);
+        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17, completedInvestigation);
       }});
     } else {
       openDialogue([
@@ -1809,7 +1835,7 @@
         {speaker:"도구리", text:"열쇠 구멍이 있지만 열쇠는 보이지 않는다.", thought:true}
       ], { mode:"first", onComplete:() => {
         setMode("investigate");
-        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17);
+        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17, completedInvestigation);
       }});
     }
   }
@@ -2151,6 +2177,38 @@
     renderReasoning();
     $("dim").classList.remove("hidden");
     $("reasoningPopup").classList.remove("hidden");
+    requestAnimationFrame(fitReasoningContentToViewport);
+  }
+
+  function fitReasoningContentToViewport() {
+    const popup = $("reasoningPopup");
+    if (!popup || popup.classList.contains("hidden")) return;
+
+    const viewport = $("reasoningContentViewport");
+    const content = $("reasoningContent");
+    const actions = popup.querySelector(".popup-actions");
+    if (!viewport || !content || !actions) return;
+
+    content.style.transform = "scale(1)";
+    viewport.style.height = "auto";
+
+    const contentHeight = content.scrollHeight;
+    const popupStyle = getComputedStyle(popup);
+    const actionsStyle = getComputedStyle(actions);
+    const paddingTop = parseFloat(popupStyle.paddingTop) || 0;
+    const paddingBottom = parseFloat(popupStyle.paddingBottom) || 0;
+    const actionsMarginTop = parseFloat(actionsStyle.marginTop) || 0;
+    const actionsHeight = actions.offsetHeight + actionsMarginTop;
+    const viewportRatio = innerWidth <= 700 ? 0.96 : 0.92;
+    const maxPopupHeight = innerHeight * viewportRatio;
+    const availableContentHeight = Math.max(
+      120,
+      maxPopupHeight - paddingTop - paddingBottom - actionsHeight
+    );
+    const scale = Math.min(1, availableContentHeight / Math.max(1, contentHeight));
+
+    content.style.transform = `scale(${scale})`;
+    viewport.style.height = `${Math.ceil(contentHeight * scale)}px`;
   }
 
   function renderReasoning() {
@@ -2225,6 +2283,9 @@
     });
     updateKeywordSelection();
     updateReasoningConfirmState();
+    if (!$("reasoningPopup").classList.contains("hidden")) {
+      requestAnimationFrame(fitReasoningContentToViewport);
+    }
   }
 
   function updateReasoningConfirmState() {
@@ -2844,7 +2905,7 @@
     if (isVisible("messagePopup")) return true;
     if (isVisible("settingsPopup")) return true;
     if (isVisible("cluePopup")) return cluePopupMode !== "present";
-    if (isVisible("reasoningPopup")) return true;
+    if (isVisible("reasoningPopup")) return false;
     return false;
   }
 
@@ -2882,8 +2943,6 @@
     }
 
     if (isVisible("reasoningPopup")) {
-      playSfx("cancel");
-      cancelReasoning(false);
       return;
     }
 
@@ -3123,6 +3182,7 @@
 
   window.addEventListener("resize", resizeScene);
   window.addEventListener("resize", updateClearInfoScale);
+  window.addEventListener("resize", fitReasoningContentToViewport);
   window.addEventListener("beforeunload", saveState);
   document.addEventListener("visibilitychange", () => { if (document.hidden) saveState(); });
   setInterval(() => { if (state.runActive) saveState(); }, 10000);
