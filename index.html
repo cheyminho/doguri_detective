@@ -445,11 +445,15 @@
     .icon-wrap:hover .tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
-  #settingsButton {
+  #settingsButton,
+  #popupCloseButton {
     position: absolute;
     right: max(16px, env(safe-area-inset-right));
     top: max(16px, env(safe-area-inset-top));
     pointer-events: auto;
+  }
+  #popupCloseButton {
+    z-index: 52;
   }
   #backButton {
     position: absolute;
@@ -1053,7 +1057,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.54</div>
+    <div id="versionLabel">v0.55</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1106,6 +1110,10 @@
 
     <div id="settingsButton" class="icon-wrap">
       <button class="icon-btn" aria-label="설정"><img src="images/icon_setup.png" alt="" /></button>
+    </div>
+
+    <div id="popupCloseButton" class="icon-wrap hidden">
+      <button class="icon-btn" aria-label="닫기"><img src="images/icon_back.png" alt="" draggable="false" /></button>
     </div>
 
     <div id="backButton" class="icon-wrap hidden">
@@ -1980,13 +1988,16 @@
     $("clueConfirmButton").classList.add("hidden");
 
     const keywordWrap = $("clueKeywords");
+    keywordWrap.classList.toggle("hidden", mode === "present");
     keywordWrap.innerHTML = "";
-    getSortedKeywords(state.keywords).forEach(keyword => {
-      const chip = document.createElement("span");
-      chip.className = "clue-keyword-chip";
-      chip.textContent = keyword;
-      keywordWrap.appendChild(chip);
-    });
+    if (mode !== "present") {
+      getSortedKeywords(state.keywords).forEach(keyword => {
+        const chip = document.createElement("span");
+        chip.className = "clue-keyword-chip";
+        chip.textContent = keyword;
+        keywordWrap.appendChild(chip);
+      });
+    }
 
     $("dim").classList.remove("hidden");
     $("cluePopup").classList.remove("hidden");
@@ -2795,6 +2806,21 @@
     return !$(id).classList.contains("hidden");
   }
 
+  function canDismissTopPopup() {
+    if (dialogueLocked || !isVisible("dim")) return false;
+    if (isVisible("messagePopup")) return true;
+    if (isVisible("settingsPopup")) return true;
+    if (isVisible("cluePopup")) return cluePopupMode !== "present";
+    if (isVisible("reasoningPopup")) return true;
+    return false;
+  }
+
+  function updatePopupCloseButton() {
+    const show = canDismissTopPopup();
+    $("popupCloseButton").classList.toggle("hidden", !show);
+    $("settingsButton").classList.toggle("hidden", show || currentMode !== "investigate");
+  }
+
   function dismissTopPopup() {
     if (dialogueLocked) return;
 
@@ -2909,6 +2935,14 @@
 
   $("introScreen").addEventListener("click", advanceIntro);
   $("dim").addEventListener("click", dismissTopPopup);
+  $("popupCloseButton").querySelector("button").addEventListener("click", dismissTopPopup);
+
+  const popupCloseObserver = new MutationObserver(updatePopupCloseButton);
+  ["dim","messagePopup","settingsPopup","cluePopup","reasoningPopup","choicePopup","dialogueBlocker"].forEach(id => {
+    popupCloseObserver.observe($(id), {attributes:true, attributeFilter:["class"]});
+  });
+  updatePopupCloseButton();
+
   $("noteButton").addEventListener("click", () => {
     playSfx("click");
     state.noteUpdated = false;
