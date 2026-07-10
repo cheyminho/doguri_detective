@@ -289,6 +289,15 @@
     object-position: center center;
   }
   #startTitleGroup {
+    /*
+      부제는 title.png의 실제 표시 너비에만 연동됩니다.
+      아래 두 비율만 바꾸면 PC/모바일 공통으로 조정됩니다.
+      0.048  = 타이틀 이미지 너비의 4.8% 크기
+      -0.036 = 타이틀 이미지 너비의 -3.6%만큼 위로 이동
+    */
+    --subtitle-size-ratio: 0.07;
+    --subtitle-y-ratio: -0.01;
+    --subtitle-stroke-ratio: 0.0066;
     position: absolute;
     width: min(56vw, 760px);
     left: 50%;
@@ -309,25 +318,26 @@
   #startSubtitle {
     position: relative;
     z-index: 4;
-    margin-top: clamp(-30px, -2vw, -5px);
+    margin-top: calc(var(--title-image-width) * var(--subtitle-y-ratio));
     color: #f30603;
     font-family: Georgia, "Times New Roman", "Noto Serif KR", serif;
-    font-size: clamp(26px, 2.7vw, 34px);
+    font-size: calc(var(--title-image-width) * var(--subtitle-size-ratio));
     font-weight: 700;
     line-height: 1.15;
     letter-spacing: .08em;
     white-space: nowrap;
-    -webkit-text-stroke: 5px #fff;
+    -webkit-text-stroke-width: calc(var(--title-image-width) * var(--subtitle-stroke-ratio));
+    -webkit-text-stroke-color: #fff;
     paint-order: stroke fill;
     text-shadow: none;
   }
   #startDoguri {
     position: absolute;
-    width: 82vh;
-    height: 82vh;
+    width: 84vh;
+    height: 84vh;
     object-fit: contain;
     left: 50%;
-    top: 66%;
+    top: 73%;
     transform: translate(-50%, -50%);
     z-index: 2;
   }
@@ -338,7 +348,7 @@
     transform: translateX(-50%);
     z-index: 3;
     isolation: isolate;
-    font-size: clamp(20px, 2.5vw, 36px);
+    font-size: clamp(20px, 2.5vw, 44px);
     font-weight: 400;
     letter-spacing: .04em;
     text-shadow: 0 2px 12px rgba(0,0,0,.8);
@@ -410,7 +420,7 @@
   #bottomBar {
     position: absolute;
     left: 50%;
-    bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px));
+    bottom: max(18px, calc(env(safe-area-inset-bottom) + 45px));
     transform: translateX(-50%);
     display: flex;
     gap: clamp(14px, 2.3vw, 34px);
@@ -419,8 +429,8 @@
   .icon-wrap { position: relative; }
   .update-badge {
     position: absolute;
-    top: -12px;
-    right: -2px;
+    top: -18px;
+    right: -10px;
     z-index: 4;
     width: clamp(36px, 4vw, 64px);
     height: clamp(36px, 4vw, 64px);
@@ -440,12 +450,14 @@
   .tooltip {
     position: absolute;
     left: 50%;
-    bottom: calc(100% + 14px);
+    bottom: calc(100% + 24px);
     transform: translateX(-50%) translateY(6px);
-    padding: 9px 14px;
-    border-radius: 14px;
+    padding: 12px 19px;
+    border-radius: 18px;
     background: #000;
     color: #fff;
+    font-size: clamp(17px, 1.55vw, 23px);
+    line-height: 1.2;
     font-weight: 700;
     white-space: nowrap;
     opacity: 0;
@@ -460,9 +472,9 @@
     transform: translateX(-50%);
     width: 0;
     height: 0;
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-    border-top: 9px solid #000;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 12px solid #000;
   }
   @media (hover: hover) and (pointer: fine) {
     .icon-wrap:hover .tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -817,10 +829,12 @@
     position: fixed;
     left: -9999px;
     top: -9999px;
+    z-index: 9999;
     display: inline-flex;
     padding: 12px;
     overflow: visible;
     pointer-events: none;
+    transform: translate(-50%, -115%);
   }
 
   /* Clear result */
@@ -1011,12 +1025,6 @@
   /* Mobile */
   @media (max-width: 700px) {
     #startTitleGroup { width: 78vw; top: 5vh; }
-    #startSubtitle {
-      margin-top: -11px;
-      font-size: clamp(21px, 5.8vw, 31px);
-      -webkit-text-stroke-width: 4px;
-      letter-spacing: .06em;
-    }
 
     /* 타이틀 화면 도구리 - 모바일 전용 크기 / 위치 */
     #startDoguri {
@@ -1099,7 +1107,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.58</div>
+    <div id="versionLabel">v0.59</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1376,6 +1384,8 @@
   let cluePopupMode = "view";
   let selectedKeyword = null;
   let reasoningSlots = Array(finalAnswers.length).fill("");
+  let keywordPointerDrag = null;
+  let suppressKeywordClick = false;
   let dialogue = null;
   let dialogueLocked = false;
   let toastTimer = null;
@@ -1660,6 +1670,27 @@
     $("sceneViewport").classList.remove("cursor-drag");
     updateHotspots();
     clampPan();
+  }
+
+  function syncStartSubtitleToTitleImage() {
+    const title = $("startTitle");
+    const group = $("startTitleGroup");
+    if (!title || !group) return;
+
+    const rect = title.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    // object-fit: contain으로 실제 화면에 보이는 title.png의 가로 길이를 계산한다.
+    let renderedTitleWidth = rect.width;
+    if (title.naturalWidth > 0 && title.naturalHeight > 0) {
+      const imageRatio = title.naturalWidth / title.naturalHeight;
+      const boxRatio = rect.width / rect.height;
+      renderedTitleWidth = boxRatio > imageRatio
+        ? rect.height * imageRatio
+        : rect.width;
+    }
+
+    group.style.setProperty("--title-image-width", `${renderedTitleWidth}px`);
   }
 
   function resizeScene() {
@@ -2211,6 +2242,86 @@
     viewport.style.height = `${Math.ceil(contentHeight * scale)}px`;
   }
 
+  function createKeywordDragPreview(chip) {
+    const preview = document.createElement("div");
+    preview.className = "keyword-drag-preview";
+    const previewChip = chip.cloneNode(true);
+    previewChip.classList.add("selected");
+    preview.appendChild(previewChip);
+    document.body.appendChild(preview);
+    return preview;
+  }
+
+  function startKeywordPointerDrag(e, chip, word) {
+    // PC 마우스는 기존 HTML5 drag/drop을 사용하고,
+    // 모바일 터치와 펜 입력만 Pointer Events로 직접 처리한다.
+    if (e.pointerType === "mouse") return;
+
+    keywordPointerDrag = {
+      pointerId: e.pointerId,
+      chip,
+      word,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+      preview: null
+    };
+    chip.setPointerCapture?.(e.pointerId);
+  }
+
+  function moveKeywordPointerDrag(e) {
+    const dragInfo = keywordPointerDrag;
+    if (!dragInfo || e.pointerId !== dragInfo.pointerId) return;
+
+    const dx = e.clientX - dragInfo.startX;
+    const dy = e.clientY - dragInfo.startY;
+    if (!dragInfo.moved && Math.hypot(dx, dy) <= 8) return;
+
+    if (!dragInfo.moved) {
+      dragInfo.moved = true;
+      suppressKeywordClick = true;
+      selectedKeyword = dragInfo.word;
+      updateKeywordSelection();
+      dragInfo.preview = createKeywordDragPreview(dragInfo.chip);
+    }
+
+    e.preventDefault();
+    dragInfo.preview.style.left = `${e.clientX}px`;
+    dragInfo.preview.style.top = `${e.clientY}px`;
+  }
+
+  function finishKeywordPointerDrag(e, cancelled = false) {
+    const dragInfo = keywordPointerDrag;
+    if (!dragInfo || e.pointerId !== dragInfo.pointerId) return;
+
+    keywordPointerDrag = null;
+    dragInfo.preview?.remove();
+
+    if (dragInfo.moved) {
+      e.preventDefault();
+      if (!cancelled) {
+        const target = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".blank-slot");
+        if (target && $("reasoningPopup").contains(target)) {
+          const slotIndex = Number(target.dataset.slot);
+          if (Number.isInteger(slotIndex)) {
+            reasoningSlots[slotIndex] = dragInfo.word;
+            selectedKeyword = null;
+            playSfx("flick");
+            renderReasoning();
+          }
+        }
+      }
+
+      setTimeout(() => {
+        suppressKeywordClick = false;
+        if (selectedKeyword === dragInfo.word) {
+          selectedKeyword = null;
+          updateKeywordSelection();
+        }
+      }, 0);
+    }
+  }
+
   function renderReasoning() {
     const container = $("reasoningText");
     container.innerHTML = "";
@@ -2255,6 +2366,7 @@
       chip.className = "keyword-chip";
       chip.textContent = word;
       chip.draggable = true;
+      chip.addEventListener("pointerdown", (e) => startKeywordPointerDrag(e, chip, word));
       chip.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("text/plain", word);
         selectedKeyword = word;
@@ -2275,6 +2387,7 @@
         setTimeout(() => preview.remove(), 0);
       });
       chip.addEventListener("click", () => {
+        if (suppressKeywordClick) return;
         playSfx("flick");
         selectedKeyword = selectedKeyword === word ? null : word;
         updateKeywordSelection();
@@ -2363,7 +2476,6 @@
     state.runActive = false;
     state.completed = true;
     saveState();
-    showToast("추리 완료!", 3200, false);
     transitionBgm("bgm_peace.mp3", 700);
 
     setTimeout(() => {
@@ -3096,6 +3208,9 @@
 
   $("reasoningCancel").addEventListener("click", () => { playSfx("cancel"); cancelReasoning(true); });
   $("reasoningConfirm").addEventListener("click", submitReasoning);
+  document.addEventListener("pointermove", moveKeywordPointerDrag, {passive:false});
+  document.addEventListener("pointerup", e => finishKeywordPointerDrag(e, false), {passive:false});
+  document.addEventListener("pointercancel", e => finishKeywordPointerDrag(e, true), {passive:false});
 
   $("titleButton").addEventListener("click", () => { playSfx("confirm"); goTitleFromSettings(); });
   $("settingsNewGameButton").addEventListener("click", () => {
@@ -3183,6 +3298,11 @@
   window.addEventListener("resize", resizeScene);
   window.addEventListener("resize", updateClearInfoScale);
   window.addEventListener("resize", fitReasoningContentToViewport);
+  window.addEventListener("resize", syncStartSubtitleToTitleImage);
+
+  const startTitleResizeObserver = new ResizeObserver(syncStartSubtitleToTitleImage);
+  startTitleResizeObserver.observe($("startTitle"));
+  $("startTitle").addEventListener("load", syncStartSubtitleToTitleImage);
   window.addEventListener("beforeunload", saveState);
   document.addEventListener("visibilitychange", () => { if (document.hidden) saveState(); });
   setInterval(() => { if (state.runActive) saveState(); }, 10000);
@@ -3210,6 +3330,7 @@
 
   // Initialize
   buildHotspots();
+  syncStartSubtitleToTitleImage();
   resizeScene();
   applyStrangeHat();
   updateMenuBadges();
