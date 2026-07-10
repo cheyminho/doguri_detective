@@ -453,7 +453,7 @@
     pointer-events: auto;
   }
   #popupCloseButton {
-    z-index: 52;
+    z-index: 60;
   }
   #backButton {
     position: absolute;
@@ -1057,7 +1057,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.55</div>
+    <div id="versionLabel">v0.56</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1112,13 +1112,14 @@
       <button class="icon-btn" aria-label="설정"><img src="images/icon_setup.png" alt="" /></button>
     </div>
 
-    <div id="popupCloseButton" class="icon-wrap hidden">
-      <button class="icon-btn" aria-label="닫기"><img src="images/icon_back.png" alt="" draggable="false" /></button>
-    </div>
-
     <div id="backButton" class="icon-wrap hidden">
       <button class="icon-btn" aria-label="뒤로가기"><img src="images/icon_back.png" alt="" /></button>
     </div>
+  </div>
+
+  <!-- 딤드/블러보다 위에 표시되는 팝업 닫기 버튼 -->
+  <div id="popupCloseButton" class="icon-wrap hidden">
+    <button class="icon-btn" aria-label="닫기"><img src="images/icon_back.png" alt="" draggable="false" /></button>
   </div>
 
   <div id="characterLayer" class="hidden">
