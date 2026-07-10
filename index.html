@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0b0d" />
 <title>명탐정 도구리</title>
+<meta name="description" content="명탐정 도구리 - 겨울 산장 살인 사건" />
+
+<!-- 링크 공유 미리보기 -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="명탐정 도구리" />
+<meta property="og:description" content="겨울 산장 살인 사건" />
+<meta property="og:image" content="images/thumb_0.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:type" content="image/png" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="명탐정 도구리" />
+<meta name="twitter:description" content="겨울 산장 살인 사건" />
+<meta name="twitter:image" content="images/thumb_0.png" />
 <style>
   :root {
     --doguri: #f79f92;
@@ -1107,7 +1122,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.59</div>
+    <div id="versionLabel">v0.6</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -2245,6 +2260,8 @@
   function createKeywordDragPreview(chip) {
     const preview = document.createElement("div");
     preview.className = "keyword-drag-preview";
+    // 모바일 터치 드래그는 손가락 좌표와 미리보기 중심을 정확히 맞춘다.
+    preview.style.transform = "translate(-50%, -50%)";
     const previewChip = chip.cloneNode(true);
     previewChip.classList.add("selected");
     preview.appendChild(previewChip);
