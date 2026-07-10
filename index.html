@@ -288,15 +288,38 @@
     object-fit: cover;
     object-position: center center;
   }
-  #startTitle {
+  #startTitleGroup {
     position: absolute;
     width: min(56vw, 760px);
-    max-height: 34vh;
-    object-fit: contain;
     left: 50%;
     top: 3vh;
     transform: translateX(-50%);
+    z-index: 5;
+    text-align: center;
+    pointer-events: none;
+  }
+  #startTitle {
+    position: relative;
     z-index: 2;
+    display: block;
+    width: 100%;
+    max-height: 34vh;
+    object-fit: contain;
+  }
+  #startSubtitle {
+    position: relative;
+    z-index: 4;
+    margin-top: clamp(-30px, -2vw, -5px);
+    color: #f30603;
+    font-family: Georgia, "Times New Roman", "Noto Serif KR", serif;
+    font-size: clamp(26px, 2.7vw, 34px);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: .08em;
+    white-space: nowrap;
+    -webkit-text-stroke: 5px #fff;
+    paint-order: stroke fill;
+    text-shadow: none;
   }
   #startDoguri {
     position: absolute;
@@ -979,7 +1002,13 @@
 
   /* Mobile */
   @media (max-width: 700px) {
-    #startTitle { width: 78vw; top: 5vh; }
+    #startTitleGroup { width: 78vw; top: 5vh; }
+    #startSubtitle {
+      margin-top: -11px;
+      font-size: clamp(21px, 5.8vw, 31px);
+      -webkit-text-stroke-width: 4px;
+      letter-spacing: .06em;
+    }
 
     /* 타이틀 화면 도구리 - 모바일 전용 크기 / 위치 */
     #startDoguri {
@@ -1057,7 +1086,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.56</div>
+    <div id="versionLabel">v0.57</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1071,7 +1100,10 @@
 
   <div id="startScreen" class="hidden">
     <img id="startBg" src="images/bg_title.png" alt="" draggable="false" />
-    <img id="startTitle" src="images/title.png" alt="명탐정 도구리" draggable="false" />
+    <div id="startTitleGroup">
+      <img id="startTitle" src="images/title.png" alt="명탐정 도구리" draggable="false" />
+      <div id="startSubtitle">겨울 산장 살인 사건</div>
+    </div>
     <img id="startDoguri" src="images/doguri_title.png" alt="" draggable="false" />
     <div id="startPrompt" class="serif">화면을 눌러 게임을 시작하세요.</div>
   </div>
@@ -2903,17 +2935,37 @@
   $("newGameConfirmButton").addEventListener("click", () => {
     const fromSettings = newGameConfirmFromSettings;
     newGameConfirmFromSettings = false;
-    $("newGameConfirmPopup").classList.add("hidden");
-    $("newGameConfirmDim").classList.add("hidden");
+    playSfx("confirm");
+    pauseBgmForTitleGate();
 
-    if (fromSettings) {
-      closeAllPopups();
-      setSceneVisible(false);
-    }
+    // 팝업과 기존 화면은 그대로 둔 채 먼저 검게 덮는다.
+    // 완전히 어두워진 뒤에 초기화와 타이틀 화면 전환을 처리해
+    // 이전 화면이 순간적으로 보이는 현상을 막는다.
+    fadeToBlack(() => {
+      $("newGameConfirmPopup").classList.add("hidden");
+      $("newGameConfirmDim").classList.add("hidden");
 
-    // 현재 회차만 초기화하므로 이상한 모자 해금/ON 상태는 유지된다.
-    resetCurrentRun(false);
-    enterTitleFromInitial();
+      if (fromSettings) {
+        closeAllPopups();
+        setSceneVisible(false);
+      }
+
+      // 현재 회차만 초기화하므로 이상한 모자 해금/ON 상태는 유지된다.
+      resetCurrentRun(false);
+
+      $("initialScreen").classList.add("hidden");
+      $("startScreen").classList.remove("hidden");
+      $("startPrompt").classList.remove("hidden");
+      currentMode = "title";
+
+      clearTimeout(titleBgmTimer);
+      titleBgmTimer = setTimeout(() => {
+        titleBgmTimer = null;
+        if (currentMode === "title" && !$("startScreen").classList.contains("hidden")) {
+          playBgm("bgm_start.mp3");
+        }
+      }, 500);
+    });
   });
   $("testResetButton").addEventListener("click", () => {
     playSfx("confirm");
