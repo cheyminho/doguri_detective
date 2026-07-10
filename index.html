@@ -968,6 +968,14 @@
     }
 
     #startPrompt { font-size: 24px; bottom: max(8vh, calc(env(safe-area-inset-bottom) + 12px)); }
+
+    /* 사건 소개 문장 - 모바일 전용 동일 크기 / 한 줄 표시 */
+    #introText {
+      max-width: none;
+      font-size: clamp(24px, 3.8vw, 18px);
+      white-space: nowrap;
+    }
+
     .popup { width: 88vw; padding: 20px; border-radius: 20px; }
     #clueGrid { gap: 0; }
     .clue-cell { border-radius: 0; }
@@ -1015,7 +1023,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.51</div>
+    <div id="versionLabel">v0.52</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1708,7 +1716,7 @@
         {speaker:"도구리", text:"열쇠가 맞네.", thought:true},
         {speaker:"도구리", text:"누군가 일부러 창문을 잠근 건가…?", thought:true}
       ], { mode:"first", onComplete:() => {
-        playSfx("windowopen");
+        setTimeout(() => playSfx("windowopen"), 1000);
         state.windowOpen = true;
         saveState();
         updateHotspots();
