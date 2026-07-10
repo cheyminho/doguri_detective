@@ -58,25 +58,16 @@
     user-drag: none;
     -webkit-touch-callout: none;
   }
-  /* 게임 영역에서는 브라우저 시스템 커서가 노출되지 않도록 게임 커서를 강제한다. */
   #app, #app * {
-    cursor: url("images/cursor_default.png") 64 64, auto !important;
+    cursor: url("images/cursor_default.png") 64 64, auto;
   }
   #sceneViewport.cursor-investigate,
   #sceneViewport.cursor-investigate * {
-    cursor: url("images/cursor_investigate.png") 64 64, auto !important;
+    cursor: url("images/cursor_investigate.png") 64 64, auto;
   }
   #sceneViewport.cursor-drag,
   #sceneViewport.cursor-drag * {
-    cursor: url("images/cursor_drag.png") 64 64, auto !important;
-  }
-
-  /* 기본 커서 영역을 누르거나 키워드를 드래그하는 동안 드래그 커서 표시 */
-  #app.cursor-pressed,
-  #app.cursor-pressed *,
-  #app.keyword-dragging,
-  #app.keyword-dragging * {
-    cursor: url("images/cursor_drag.png") 64 64, auto !important;
+    cursor: url("images/cursor_drag.png") 64 64, auto;
   }
   button, input { font: inherit; }
   button {
@@ -311,6 +302,52 @@
     height: 100%;
     object-fit: cover;
     object-position: center center;
+  }
+  #startSnow {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .title-snowflake {
+    position: absolute;
+    left: var(--x);
+    top: var(--start-y);
+    width: var(--flake-w);
+    height: var(--flake-h);
+    border-radius: 50%;
+    background: rgba(255,255,255,var(--alpha));
+    filter: blur(var(--blur));
+    box-shadow:
+      0 0 calc(var(--flake-w) * .45) rgba(255,255,255,.46),
+      inset 0 0 calc(var(--flake-h) * .18) rgba(255,255,255,.28);
+    transform: translate3d(0, 0, 0) rotate(var(--rot-0));
+    animation: titleSnowGust var(--duration) linear var(--delay) infinite;
+    will-change: transform;
+  }
+  @keyframes titleSnowGust {
+    0% {
+      transform: translate3d(0, 0, 0) rotate(var(--rot-0));
+    }
+    16% {
+      transform: translate3d(var(--path-x1), var(--path-y1), 0) rotate(var(--rot-1));
+    }
+    33% {
+      transform: translate3d(var(--path-x2), var(--path-y2), 0) rotate(var(--rot-2));
+    }
+    50% {
+      transform: translate3d(var(--path-x3), var(--path-y3), 0) rotate(var(--rot-3));
+    }
+    67% {
+      transform: translate3d(var(--path-x4), var(--path-y4), 0) rotate(var(--rot-4));
+    }
+    84% {
+      transform: translate3d(var(--path-x5), var(--path-y5), 0) rotate(var(--rot-5));
+    }
+    100% {
+      transform: translate3d(var(--drift-x), var(--fall-y), 0) rotate(var(--rot-6));
+    }
   }
   #startTitleGroup {
     /*
@@ -877,10 +914,20 @@
     border-radius: 0;
     background: #000;
   }
+  #clearBg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    z-index: 0;
+    pointer-events: none;
+  }
   #clearConfettiLayer {
     position: absolute;
     inset: 0;
-    z-index: 1;
+    z-index: 100;
     overflow: hidden;
     pointer-events: none;
   }
@@ -976,6 +1023,15 @@
     font-size: clamp(25px, 3vw, 42px);
     font-weight: 400;
   }
+  #clearScore.clear-perfect-pulse {
+    animation: clearPerfectScorePulse .9s cubic-bezier(.22, 1, .36, 1) both;
+  }
+  @keyframes clearPerfectScorePulse {
+    0% { transform: scale(1); }
+    42% { transform: scale(1.34); }
+    68% { transform: scale(.96); }
+    100% { transform: scale(1); }
+  }
   #clearCommentRow {
     display: flex;
     align-items: center;
@@ -1018,6 +1074,15 @@
     object-fit: contain;
     flex: 0 0 auto;
   }
+  #clearTranslation {
+    max-width: min(92vw, 700px);
+    margin: clamp(14px, 2vh, 24px) 0 0;
+    font-size: calc(clamp(20px, 2.1vw, 30px) - 2px);
+    font-weight: 500;
+    color: rgba(255,255,255,.82);
+    line-height: 1.45;
+    word-break: keep-all;
+  }
   #clearActions {
     margin-top: auto;
     margin-bottom: clamp(26px, 6vh, 68px);
@@ -1050,6 +1115,30 @@
     transition: opacity .65s ease;
   }
   #fade.on { opacity: 1; pointer-events: auto; }
+
+  /* PC 게임 커서: 브라우저 기본 커서를 숨기고 리소스를 직접 따라다니게 한다. */
+  #gameCursor {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1000000;
+    width: 128px;
+    height: 128px;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    will-change: left, top;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    html, body, body *, #app, #app * {
+      cursor: none !important;
+    }
+  }
+  @media (hover: none), (pointer: coarse) {
+    #gameCursor { display: none !important; }
+  }
 
   /* Mobile */
   @media (max-width: 700px) {
@@ -1106,6 +1195,7 @@
 </head>
 <body>
 <div id="app">
+  <img id="gameCursor" src="images/cursor_default.png" alt="" draggable="false" aria-hidden="true" />
   <div id="sceneViewport" class="hidden">
     <div id="sceneInner">
       <img id="sceneBg" src="images/bg_lodge.png" alt="" draggable="false" />
@@ -1129,14 +1219,15 @@
       <button id="testModeToggle" type="button">테스트 모드 OFF</button>
       <select id="testScoreSelect" aria-label="테스트 추리력 점수" disabled>
         <option value="100">추리력 100점</option>
-        <option value="90">추리력 90점</option>
-        <option value="80">추리력 80점</option>
-        <option value="70">추리력 70점</option>
-        <option value="60">추리력 60점</option>
+        <option value="95">추리력 95점</option>
+        <option value="85">추리력 85점</option>
+        <option value="75">추리력 75점</option>
+        <option value="65">추리력 65점</option>
+        <option value="50">추리력 50점</option>
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.65</div>
+    <div id="versionLabel">v0.66</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1150,6 +1241,7 @@
 
   <div id="startScreen" class="hidden">
     <img id="startBg" src="images/bg_title.png" alt="" draggable="false" />
+    <div id="startSnow" aria-hidden="true"></div>
     <div id="startTitleGroup">
       <img id="startTitle" src="images/title.png" alt="명탐정 도구리" draggable="false" />
       <div id="startSubtitle">겨울 산장 살인 사건</div>
@@ -1261,6 +1353,7 @@
   </div>
 
   <div id="clearPopup" class="hidden">
+    <img id="clearBg" src="images/bg_clear.png" alt="" draggable="false" />
     <div id="clearConfettiLayer" aria-hidden="true"></div>
     <div id="clearContent">
       <h2 id="clearTitle" class="clear-reveal">클리어!</h2>
@@ -1276,6 +1369,7 @@
             <div id="clearCommentBubble"><span id="clearCommentText"></span></div>
             <img id="clearCommentMung" src="images/mung_s.png" alt="멍반장" draggable="false" />
           </div>
+          <div id="clearTranslation" class="clear-reveal hidden">번역: 완벽했다는 뜻인 것 같다.</div>
         </div>
       </div>
       <div id="clearActions" class="popup-actions clear-reveal">
@@ -1434,6 +1528,12 @@
   let birdFrameTimer = null;
   let birdVisible = false;
   let drag = { active:false, moved:false, startX:0, startY:0, startPanX:0, startPanY:0 };
+  let gameCursorPressed = false;
+  let gameCursorPressedAt = 0;
+  let gameCursorReleaseTimer = null;
+  let gameCursorLastX = innerWidth / 2;
+  let gameCursorLastY = innerHeight / 2;
+  const GAME_CURSOR_MIN_PRESS_MS = 120;
   let panX = 0;
   let panY = 0;
   let sceneScale = 1;
@@ -1442,6 +1542,9 @@
   let introLines = [];
   let introIndex = 0;
   let introBusy = false;
+  let introAdvanceTimer = null;
+  let introShowRaf = null;
+  let bgmResumeAfterVisibility = false;
   let testModeEnabled = false;
   let testModeScore = 100;
   let newGameConfirmFromSettings = false;
@@ -1496,6 +1599,14 @@
     audio.bgm.src = `bgm/${name}`;
     audio.bgm.currentTime = 0;
     audio.bgm.volume = BGM_VOLUME;
+
+    // 탭이 숨겨졌거나 다른 앱/윈도우로 포커스가 이동했으면 BGM을 시작하지 않는다.
+    if (document.hidden || !document.hasFocus()) {
+      bgmResumeAfterVisibility = true;
+      return;
+    }
+
+    bgmResumeAfterVisibility = false;
     audio.bgm.play().catch(()=>{});
   }
 
@@ -1503,6 +1614,18 @@
     if (currentBgm === name && !audio.bgm.paused) return;
     cancelBgmTransition();
 
+    // 탭이 숨겨졌거나 다른 앱/윈도우로 포커스가 이동했으면 크로스페이드도 재생하지 않는다.
+    if (document.hidden || !document.hasFocus()) {
+      currentBgm = name;
+      audio.bgm.pause();
+      audio.bgm.src = `bgm/${name}`;
+      audio.bgm.currentTime = 0;
+      audio.bgm.volume = BGM_VOLUME;
+      bgmResumeAfterVisibility = true;
+      return;
+    }
+
+    bgmResumeAfterVisibility = false;
     const from = audio.bgm;
     const fromStartVolume = from.paused ? 0 : from.volume;
     const to = new Audio(`bgm/${name}`);
@@ -1538,7 +1661,34 @@
   function stopBgm() {
     cancelBgmTransition();
     audio.bgm.pause();
+    bgmResumeAfterVisibility = false;
     currentBgm = "";
+  }
+
+  function pauseBgmForBackground() {
+    const wasPlaying = !audio.bgm.paused || Boolean(outgoingBgm && !outgoingBgm.paused);
+    if (wasPlaying) bgmResumeAfterVisibility = true;
+    cancelBgmTransition();
+    audio.bgm.pause();
+  }
+
+  function resumeBgmFromBackground() {
+    if (document.hidden || !document.hasFocus()) return;
+    if (!bgmResumeAfterVisibility || !currentBgm) return;
+
+    bgmResumeAfterVisibility = false;
+    audio.bgm.volume = BGM_VOLUME;
+    audio.bgm.play().catch(()=>{});
+  }
+
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      saveState();
+      pauseBgmForBackground();
+      return;
+    }
+
+    resumeBgmFromBackground();
   }
 
   function loadState() {
@@ -1693,6 +1843,75 @@
     $("mainUi").classList.toggle("hidden", !on);
   }
 
+  function getGameCursorBaseSrc(target = null) {
+    const sceneViewport = $("sceneViewport");
+    const targetElement = target instanceof Element ? target : null;
+    const isInvestigatingScene =
+      currentMode === "investigate" &&
+      sceneViewport &&
+      !sceneViewport.classList.contains("hidden") &&
+      targetElement &&
+      sceneViewport.contains(targetElement);
+
+    return isInvestigatingScene
+      ? "images/cursor_investigate.png"
+      : "images/cursor_default.png";
+  }
+
+  function setGameCursorSrc(src) {
+    const cursor = $("gameCursor");
+    if (!cursor || cursor.getAttribute("src") === src) return;
+    cursor.setAttribute("src", src);
+  }
+
+  function updateGameCursorVisual(target = null) {
+    const cursor = $("gameCursor");
+    if (!cursor || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
+    if (gameCursorPressed) {
+      setGameCursorSrc("images/cursor_drag.png");
+      return;
+    }
+
+    const resolvedTarget = target || document.elementFromPoint(gameCursorLastX, gameCursorLastY);
+    setGameCursorSrc(getGameCursorBaseSrc(resolvedTarget));
+  }
+
+  function moveGameCursor(e) {
+    if (e.pointerType && e.pointerType !== "mouse") return;
+    const cursor = $("gameCursor");
+    if (!cursor) return;
+
+    gameCursorLastX = e.clientX;
+    gameCursorLastY = e.clientY;
+    cursor.style.left = `${gameCursorLastX}px`;
+    cursor.style.top = `${gameCursorLastY}px`;
+    cursor.style.opacity = "1";
+    updateGameCursorVisual(e.target);
+  }
+
+  function pressGameCursor(e) {
+    if (e.pointerType && e.pointerType !== "mouse") return;
+    clearTimeout(gameCursorReleaseTimer);
+    gameCursorReleaseTimer = null;
+    gameCursorPressed = true;
+    gameCursorPressedAt = performance.now();
+    setGameCursorSrc("images/cursor_drag.png");
+  }
+
+  function releaseGameCursor(e) {
+    if (e.pointerType && e.pointerType !== "mouse") return;
+    const elapsed = performance.now() - gameCursorPressedAt;
+    const remaining = Math.max(0, GAME_CURSOR_MIN_PRESS_MS - elapsed);
+
+    clearTimeout(gameCursorReleaseTimer);
+    gameCursorReleaseTimer = setTimeout(() => {
+      gameCursorPressed = false;
+      gameCursorReleaseTimer = null;
+      updateGameCursorVisual();
+    }, remaining);
+  }
+
   function setMode(mode) {
     const normalPlay = mode === "base" || mode === "investigate";
     currentMode = normalPlay ? "investigate" : mode;
@@ -1703,6 +1922,7 @@
     $("sceneViewport").classList.remove("cursor-drag");
     updateHotspots();
     clampPan();
+    updateGameCursorVisual();
   }
 
   function syncStartSubtitleToTitleImage() {
@@ -1876,7 +2096,7 @@
 
     if (hasKey) {
       openDialogue([
-        {speaker:"도구리", text:"열쇠가 맞네.", thought:true},
+        {speaker:"도구리", text:"열쇠가 딱 맞네.", thought:true},
         {speaker:"도구리", text:"누군가 일부러 창문을 잠근 건가…?", thought:true}
       ], { mode:"first", onComplete:() => {
         playSfx("windowopen");
@@ -2288,8 +2508,10 @@
   }
 
   function startKeywordPointerDrag(e, chip, word) {
-    // PC/모바일 모두 Pointer Events 기반의 게임 내부 드래그를 사용한다.
-    // 브라우저 기본 HTML5 drag/drop을 쓰지 않아 시스템 커서가 나타나지 않는다.
+    // PC 마우스는 기존 HTML5 drag/drop을 사용하고,
+    // 모바일 터치와 펜 입력만 Pointer Events로 직접 처리한다.
+    if (e.pointerType === "mouse") return;
+
     keywordPointerDrag = {
       pointerId: e.pointerId,
       chip,
@@ -2313,7 +2535,6 @@
     if (!dragInfo.moved) {
       dragInfo.moved = true;
       suppressKeywordClick = true;
-      $("app").classList.add("keyword-dragging");
       selectedKeyword = dragInfo.word;
       updateKeywordSelection();
       dragInfo.preview = createKeywordDragPreview(dragInfo.chip);
@@ -2330,7 +2551,6 @@
 
     keywordPointerDrag = null;
     dragInfo.preview?.remove();
-    $("app").classList.remove("keyword-dragging");
 
     if (dragInfo.moved) {
       e.preventDefault();
@@ -2391,8 +2611,27 @@
       const chip = document.createElement("button");
       chip.className = "keyword-chip";
       chip.textContent = word;
-      chip.draggable = false;
+      chip.draggable = true;
       chip.addEventListener("pointerdown", (e) => startKeywordPointerDrag(e, chip, word));
+      chip.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", word);
+        selectedKeyword = word;
+        updateKeywordSelection();
+
+        const preview = document.createElement("div");
+        preview.className = "keyword-drag-preview";
+        const previewChip = chip.cloneNode(true);
+        previewChip.classList.add("selected");
+        preview.appendChild(previewChip);
+        document.body.appendChild(preview);
+
+        e.dataTransfer.setDragImage(
+          preview,
+          preview.offsetWidth / 2,
+          preview.offsetHeight / 2
+        );
+        setTimeout(() => preview.remove(), 0);
+      });
       chip.addEventListener("click", () => {
         if (suppressKeywordClick) return;
         playSfx("flick");
@@ -2432,6 +2671,16 @@
         reasoningSlots[idx] = "";
         renderReasoning();
       }
+    });
+    slot.addEventListener("dragover", e => {
+      e.preventDefault();
+    });
+    slot.addEventListener("drop", e => {
+      e.preventDefault();
+      reasoningSlots[idx] = e.dataTransfer.getData("text/plain");
+      selectedKeyword = null;
+      playSfx("flick");
+      renderReasoning();
     });
     return slot;
   }
@@ -2489,6 +2738,73 @@
     }, 450);
   }
 
+  function buildTitleSnow() {
+    const layer = $("startSnow");
+    if (!layer || layer.childElementCount > 0) return;
+
+    const pieceCount = 168;
+    const pathRatios = [.16, .33, .5, .67, .84];
+
+    for (let i = 0; i < pieceCount; i++) {
+      const flake = document.createElement("span");
+      flake.className = "title-snowflake";
+
+      const depth = Math.random();
+      const size = 3.4 + depth * 7.2;
+      const flakeW = size * (1.12 + Math.random() * .48);
+      const flakeH = size * (.84 + Math.random() * .22);
+      const duration = 1800 + (1 - depth) * 2600 + Math.random() * 900;
+      const delay = -Math.random() * duration;
+      const driftX = -(58 + depth * 52 + Math.random() * 82);
+      const fallY = 116 + Math.random() * 42;
+      const startY = -10 - Math.random() * 24;
+      const alpha = 0.44 + depth * 0.5;
+      const blur = depth < .18 ? 1.6 : depth < .45 ? .9 : depth < .72 ? .35 : 0;
+
+      // 눈발의 긴 축이 실제 이동 방향을 바라보도록 화면 비율까지 반영한다.
+      const driftPx = driftX * innerWidth / 100;
+      const fallPx = fallY * innerHeight / 100;
+      const flightAngle = Math.atan2(fallPx, driftPx) * 180 / Math.PI;
+      const anglePhase = Math.random() * Math.PI * 2;
+
+      // 궤적 노이즈를 더 키워 눈보라가 조금 거칠게 흔들리도록 만든다.
+      const noiseX = .8 + depth * 1.9 + Math.random() * .85;
+      const noiseY = .28 + depth * .95 + Math.random() * .4;
+      const noiseCycles = 1.2 + Math.random() * 1.25;
+      const noisePhase = Math.random() * Math.PI * 2;
+
+      pathRatios.forEach((ratio, index) => {
+        const phase = noisePhase + ratio * Math.PI * 2 * noiseCycles;
+        const gust = Math.sin(phase) * noiseX + Math.sin(phase * 2.35 + depth * 5.1) * noiseX * .32;
+        const sway = Math.cos(phase * .92) * noiseY + Math.sin(phase * 1.78 + 1.3) * noiseY * .28;
+        const x = driftX * ratio + gust;
+        const y = fallY * ratio + sway;
+        const rot = flightAngle + Math.sin(anglePhase + ratio * Math.PI * 2) * 5.2;
+
+        flake.style.setProperty(`--path-x${index + 1}`, `${x.toFixed(2)}vw`);
+        flake.style.setProperty(`--path-y${index + 1}`, `${y.toFixed(2)}vh`);
+        flake.style.setProperty(`--rot-${index + 1}`, `${rot.toFixed(2)}deg`);
+      });
+
+      // 왼쪽으로 크게 날아가므로 화면 오른쪽 바깥에서도 눈을 생성해
+      // 아래쪽까지 내려왔을 때 우하단이 비지 않도록 한다.
+      const startX = -14 + Math.random() * (122 + Math.abs(driftX));
+      flake.style.setProperty("--x", `${startX.toFixed(2)}vw`);
+      flake.style.setProperty("--start-y", `${startY.toFixed(2)}vh`);
+      flake.style.setProperty("--flake-w", `${flakeW.toFixed(2)}px`);
+      flake.style.setProperty("--flake-h", `${flakeH.toFixed(2)}px`);
+      flake.style.setProperty("--alpha", alpha.toFixed(2));
+      flake.style.setProperty("--blur", `${blur.toFixed(2)}px`);
+      flake.style.setProperty("--duration", `${duration.toFixed(0)}ms`);
+      flake.style.setProperty("--delay", `${delay.toFixed(0)}ms`);
+      flake.style.setProperty("--drift-x", `${driftX.toFixed(2)}vw`);
+      flake.style.setProperty("--fall-y", `${fallY.toFixed(2)}vh`);
+      flake.style.setProperty("--rot-0", `${flightAngle.toFixed(2)}deg`);
+      flake.style.setProperty("--rot-6", `${flightAngle.toFixed(2)}deg`);
+      layer.appendChild(flake);
+    }
+  }
+
   function formatClearTime(ms) {
     const totalMinutes = Math.max(0, Math.floor(ms / 60000));
     const hours = Math.floor(totalMinutes / 60);
@@ -2519,18 +2835,18 @@
     if (confettiLayer) confettiLayer.innerHTML = "";
   }
 
-  function playClearConfetti() {
+  function playClearConfetti(isPerfect = false) {
     const layer = $("clearConfettiLayer");
     if (!layer) return;
 
     clearTimeout(clearConfettiTimer);
     layer.innerHTML = "";
 
-    const colors = [
-      "#02a3f4", "#7dbb02", "#ffbc03", "#f95414"
-    ];
+    const colors = isPerfect
+      ? ["#fff7c7", "#ffe27a", "#ffc846", "#e8a91f", "#c98a12"]
+      : ["#02a3f4", "#7dbb02", "#ffbc03", "#f95414"];
 
-    const pieceCount = 30;
+    const pieceCount = isPerfect ? 42 : 30;
 
     for (let i = 0; i < pieceCount; i++) {
       const piece = document.createElement("span");
@@ -2566,7 +2882,7 @@
     }, 22500);
   }
 
-  function animateDeductionScore(target, duration = 3000) {
+  function animateDeductionScore(target, duration = 3000, onComplete = null) {
     const el = $("clearScoreValue");
     const startedAt = performance.now();
     el.textContent = "0";
@@ -2580,6 +2896,7 @@
       } else {
         clearScoreRaf = null;
         el.textContent = String(target);
+        onComplete?.();
       }
     };
     clearScoreRaf = requestAnimationFrame(tick);
@@ -2657,18 +2974,30 @@
 
     const count = state.clues.filter(Boolean).length;
     const score = scoreOverride === null ? calculateDeductionScore() : scoreOverride;
+    const isPerfect = score === 100;
+    const title = $("clearTitle");
+    const scoreRow = $("clearScore");
+    const commentImage = $("clearCommentMung");
+    const translation = $("clearTranslation");
+
+    title.textContent = isPerfect ? "완벽한 추리!" : "클리어!";
     $("clearClueCount").textContent = `단서 수집: ${String(count).padStart(2,"0")} / 20`;
     $("clearTime").textContent = `클리어 타임: ${formatClearTime(state.finalTimeMs)}`;
     $("clearScoreValue").textContent = "0";
     $("clearScoreValue").style.color = score >= 90 ? "#f79f92" : "#e2a559";
-    $("clearCommentText").textContent = getClearComment(score);
-    ["clearTitle","clearClueCount","clearTime","clearScoreLabel","clearScore","clearCommentRow","clearActions"].forEach(id => $(id).classList.remove("show"));
+    $("clearCommentText").textContent = isPerfect ? "짹." : getClearComment(score);
+    commentImage.src = isPerfect ? "images/clear_s.png" : "images/mung_s.png";
+    commentImage.alt = isPerfect ? "오목눈이" : "멍반장";
+    translation.classList.toggle("hidden", !isPerfect);
+
+    ["clearTitle","clearClueCount","clearTime","clearScoreLabel","clearScore","clearCommentRow","clearTranslation","clearActions"].forEach(id => $(id).classList.remove("show"));
+    scoreRow.classList.remove("clear-perfect-pulse");
     $("clearConfirm").disabled = true;
 
     $("clearPopup").classList.remove("hidden");
     fitClearCommentToBubble();
     updateClearInfoScale();
-    playClearConfetti();
+    playClearConfetti(isPerfect);
     playSfx("applause");
     playSfx("popup");
 
@@ -2676,11 +3005,25 @@
     scheduleClearReveal("clearClueCount", 520);
     scheduleClearReveal("clearTime", 900);
     scheduleClearReveal("clearScoreLabel", 1380);
-    scheduleClearReveal("clearScore", 1680, () => animateDeductionScore(score));
-    scheduleClearReveal("clearCommentRow", 4500);
-    scheduleClearReveal("clearActions", 5200, () => {
-      $("clearConfirm").disabled = false;
-    });
+    scheduleClearReveal("clearScore", 1680, () => animateDeductionScore(score, 3000, () => {
+      if (!isPerfect) return;
+      scoreRow.classList.remove("clear-perfect-pulse");
+      void scoreRow.offsetWidth;
+      scoreRow.classList.add("clear-perfect-pulse");
+    }));
+
+    if (isPerfect) {
+      scheduleClearReveal("clearCommentRow", 5600);
+      scheduleClearReveal("clearTranslation", 5900);
+      scheduleClearReveal("clearActions", 6500, () => {
+        $("clearConfirm").disabled = false;
+      });
+    } else {
+      scheduleClearReveal("clearCommentRow", 4500);
+      scheduleClearReveal("clearActions", 5200, () => {
+        $("clearConfirm").disabled = false;
+      });
+    }
 
     if (count === 20 && !state.strangeHatUnlocked) {
       state.strangeHatUnlocked = true;
@@ -2880,6 +3223,15 @@
     }
   }
 
+  function clearIntroTransitionJobs() {
+    clearTimeout(introAdvanceTimer);
+    introAdvanceTimer = null;
+    if (introShowRaf !== null) {
+      cancelAnimationFrame(introShowRaf);
+      introShowRaf = null;
+    }
+  }
+
   function playIntro() {
     currentMode = "intro";
     pauseBgmForTitleGate();
@@ -2892,13 +3244,25 @@
     ];
     introIndex = 0;
     introBusy = false;
+    clearIntroTransitionJobs();
+    const el = $("introText");
+    el.classList.remove("show");
+    el.textContent = "";
     showIntroLine();
   }
 
   function showIntroLine() {
     const el = $("introText");
+    if (introShowRaf !== null) cancelAnimationFrame(introShowRaf);
+
+    // 이전 문장이 완전히 투명한 상태에서만 텍스트를 교체해 합성 잔상을 방지한다.
+    el.classList.remove("show");
     el.textContent = introLines[introIndex] || "";
-    requestAnimationFrame(() => el.classList.add("show"));
+    void el.offsetWidth;
+    introShowRaf = requestAnimationFrame(() => {
+      introShowRaf = null;
+      if (currentMode === "intro") el.classList.add("show");
+    });
   }
 
   function advanceIntro() {
@@ -2906,17 +3270,31 @@
     playSfx("click");
     introBusy = true;
     const el = $("introText");
+
+    // 예약되어 있던 fade-in이 뒤늦게 실행되지 않도록 취소한다.
+    if (introShowRaf !== null) {
+      cancelAnimationFrame(introShowRaf);
+      introShowRaf = null;
+    }
     el.classList.remove("show");
-    setTimeout(() => {
+
+    // CSS opacity 전환(.6s)이 끝난 뒤 문장을 교체한다.
+    // 기존 320ms 교체는 일부 브라우저에서 이전 글자 레이어가 남아 겹쳐 보일 수 있었다.
+    clearTimeout(introAdvanceTimer);
+    introAdvanceTimer = setTimeout(() => {
+      introAdvanceTimer = null;
+      if (currentMode !== "intro") return;
+
       introIndex++;
       if (introIndex < introLines.length) {
         showIntroLine();
         introBusy = false;
       } else {
         currentMode = "introTransition";
+        clearIntroTransitionJobs();
         startOpeningDialogue();
       }
-    }, 320);
+    }, 650);
   }
 
   function startOpeningDialogue() {
@@ -3284,42 +3662,32 @@
   document.addEventListener("pointerup", e => finishKeywordPointerDrag(e, false), {passive:false});
   document.addEventListener("pointercancel", e => finishKeywordPointerDrag(e, true), {passive:false});
 
-  // 기본 커서 영역은 누르는 순간 드래그 커서로 바뀐다.
-  // 아주 짧은 클릭도 보이도록 최소 표시 시간을 둔다.
-  const PRESS_CURSOR_MIN_MS = 90;
-  let pressCursorStartedAt = 0;
-  let pressCursorReleaseTimer = null;
-
-  function showPressedCursor(e) {
-    if (e.pointerType === "touch") return;
-    if (e.target.closest?.("#sceneViewport.cursor-investigate")) return;
-
-    clearTimeout(pressCursorReleaseTimer);
-    pressCursorReleaseTimer = null;
-    pressCursorStartedAt = performance.now();
-    $("app").classList.add("cursor-pressed");
-  }
-
-  function hidePressedCursor() {
-    if (!$("app").classList.contains("cursor-pressed")) return;
-
-    const elapsed = performance.now() - pressCursorStartedAt;
-    const delay = Math.max(0, PRESS_CURSOR_MIN_MS - elapsed);
-    clearTimeout(pressCursorReleaseTimer);
-    pressCursorReleaseTimer = setTimeout(() => {
-      $("app").classList.remove("cursor-pressed");
-      pressCursorReleaseTimer = null;
-    }, delay);
-  }
-
-  document.addEventListener("pointerdown", showPressedCursor, true);
-  document.addEventListener("pointerup", hidePressedCursor, true);
-  document.addEventListener("pointercancel", hidePressedCursor, true);
+  // PC에서는 시스템 커서를 완전히 숨기고 게임 커서 리소스를 직접 표시한다.
+  document.addEventListener("pointermove", moveGameCursor, {passive:true});
+  document.addEventListener("pointerdown", pressGameCursor, {passive:true});
+  document.addEventListener("pointerup", releaseGameCursor, {passive:true});
+  document.addEventListener("pointercancel", releaseGameCursor, {passive:true});
+  document.addEventListener("pointerover", (e) => {
+    if (e.pointerType && e.pointerType !== "mouse") return;
+    moveGameCursor(e);
+  }, {passive:true});
+  document.addEventListener("pointerout", (e) => {
+    if (e.pointerType && e.pointerType !== "mouse") return;
+    if (e.relatedTarget) return;
+    const cursor = $("gameCursor");
+    if (cursor) cursor.style.opacity = "0";
+  }, {passive:true});
   window.addEventListener("blur", () => {
-    clearTimeout(pressCursorReleaseTimer);
-    pressCursorReleaseTimer = null;
-    $("app").classList.remove("cursor-pressed", "keyword-dragging");
+    clearTimeout(gameCursorReleaseTimer);
+    gameCursorReleaseTimer = null;
+    gameCursorPressed = false;
+    const cursor = $("gameCursor");
+    if (cursor) cursor.style.opacity = "0";
+
+    // 다른 브라우저 탭뿐 아니라 다른 앱/윈도우로 전환해도 BGM을 멈춘다.
+    pauseBgmForBackground();
   });
+  window.addEventListener("focus", resumeBgmFromBackground);
 
   $("titleButton").addEventListener("click", () => { playSfx("confirm"); goTitleFromSettings(); });
   $("settingsNewGameButton").addEventListener("click", () => {
@@ -3367,6 +3735,8 @@
     drag.startPanX = panX;
     drag.startPanY = panY;
     drag.startedOnClue = !!e.target.closest?.(".hotspot, #birdSprite");
+    // 누르는 즉시 드래그 커서 상태로 전환한다.
+    $("sceneViewport").classList.add("cursor-drag");
     // 시작한 요소가 포인터를 잡게 하면 단서 위에서도 드래그할 수 있고,
     // 거의 움직이지 않은 경우에는 기존 클릭 판정도 그대로 유지된다.
     e.target.setPointerCapture?.(e.pointerId);
@@ -3377,7 +3747,6 @@
     const dy = e.clientY - drag.startY;
     if (Math.hypot(dx, dy) > 8 && !drag.moved) {
       drag.moved = true;
-      $("sceneViewport").classList.add("cursor-drag");
     }
     if (drag.moved) {
       panX = drag.startPanX + dx;
@@ -3418,7 +3787,7 @@
   startTitleResizeObserver.observe($("startTitle"));
   $("startTitle").addEventListener("load", syncStartSubtitleToTitleImage);
   window.addEventListener("beforeunload", saveState);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) saveState(); });
+  document.addEventListener("visibilitychange", handleVisibilityChange);
   setInterval(() => { if (state.runActive) saveState(); }, 10000);
 
   // Prevent browser zoom gestures, long-press selection, and image dragging on mobile.
@@ -3443,6 +3812,7 @@
   }, {passive:false});
 
   // Initialize
+  buildTitleSnow();
   buildHotspots();
   syncStartSubtitleToTitleImage();
   resizeScene();
