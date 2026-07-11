@@ -914,6 +914,9 @@
     color: #fff;
     font-weight: 800;
     font-size: 17px;
+    -webkit-user-drag: none;
+    user-drag: none;
+    touch-action: none;
   }
   #reasoningConfirm:disabled {
     opacity: .35;
@@ -1162,9 +1165,9 @@
     object-fit: contain;
     pointer-events: none;
     user-select: none;
-    transform: translate(-50%, -50%);
+    transform: translate3d(-9999px, -9999px, 0) translate(-50%, -50%);
     opacity: 0;
-    will-change: left, top;
+    will-change: transform, opacity;
   }
   @media (hover: hover) and (pointer: fine) {
     html, body, body *, #app, #app * {
@@ -1262,7 +1265,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.69</div>
+    <div id="versionLabel">v0.7</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1569,9 +1572,14 @@
   let birdFrameTimer = null;
   let birdVisible = false;
   let drag = { active:false, moved:false, startX:0, startY:0, startPanX:0, startPanY:0 };
+  const gameCursor = $("gameCursor");
+  const sceneViewportForCursor = $("sceneViewport");
+  const gameCursorPointerMedia = matchMedia("(hover: hover) and (pointer: fine)");
   let gameCursorPressed = false;
   let gameCursorPressedAt = 0;
   let gameCursorReleaseTimer = null;
+  let gameCursorMoveRaf = null;
+  let gameCursorPendingTarget = null;
   let gameCursorLastX = innerWidth / 2;
   let gameCursorLastY = innerHeight / 2;
   const GAME_CURSOR_MIN_PRESS_MS = 120;
@@ -1886,14 +1894,13 @@
   }
 
   function getGameCursorBaseSrc(target = null) {
-    const sceneViewport = $("sceneViewport");
     const targetElement = target instanceof Element ? target : null;
     const isInvestigatingScene =
       currentMode === "investigate" &&
-      sceneViewport &&
-      !sceneViewport.classList.contains("hidden") &&
+      sceneViewportForCursor &&
+      !sceneViewportForCursor.classList.contains("hidden") &&
       targetElement &&
-      sceneViewport.contains(targetElement);
+      sceneViewportForCursor.contains(targetElement);
 
     return isInvestigatingScene
       ? "images/cursor_investigate.png"
@@ -1901,14 +1908,12 @@
   }
 
   function setGameCursorSrc(src) {
-    const cursor = $("gameCursor");
-    if (!cursor || cursor.getAttribute("src") === src) return;
-    cursor.setAttribute("src", src);
+    if (!gameCursor || gameCursor.getAttribute("src") === src) return;
+    gameCursor.setAttribute("src", src);
   }
 
   function updateGameCursorVisual(target = null) {
-    const cursor = $("gameCursor");
-    if (!cursor || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    if (!gameCursor || !gameCursorPointerMedia.matches) return;
 
     if (gameCursorPressed) {
       setGameCursorSrc("images/cursor_drag.png");
@@ -1919,17 +1924,37 @@
     setGameCursorSrc(getGameCursorBaseSrc(resolvedTarget));
   }
 
+  function renderGameCursor() {
+    gameCursorMoveRaf = null;
+    if (!gameCursor || !gameCursorPointerMedia.matches) return;
+
+    gameCursor.style.transform =
+      `translate3d(${gameCursorLastX}px, ${gameCursorLastY}px, 0) translate(-50%, -50%)`;
+    if (gameCursor.style.opacity !== "1") gameCursor.style.opacity = "1";
+    updateGameCursorVisual(gameCursorPendingTarget);
+    gameCursorPendingTarget = null;
+  }
+
   function moveGameCursor(e) {
     if (e.pointerType && e.pointerType !== "mouse") return;
-    const cursor = $("gameCursor");
-    if (!cursor) return;
+    if (!gameCursor || !gameCursorPointerMedia.matches) return;
 
     gameCursorLastX = e.clientX;
     gameCursorLastY = e.clientY;
-    cursor.style.left = `${gameCursorLastX}px`;
-    cursor.style.top = `${gameCursorLastY}px`;
-    cursor.style.opacity = "1";
-    updateGameCursorVisual(e.target);
+    gameCursorPendingTarget = e.target instanceof Element ? e.target : null;
+
+    if (gameCursorMoveRaf === null) {
+      gameCursorMoveRaf = requestAnimationFrame(renderGameCursor);
+    }
+  }
+
+  function hideGameCursor() {
+    if (gameCursorMoveRaf !== null) {
+      cancelAnimationFrame(gameCursorMoveRaf);
+      gameCursorMoveRaf = null;
+    }
+    gameCursorPendingTarget = null;
+    if (gameCursor) gameCursor.style.opacity = "0";
   }
 
   function pressGameCursor(e) {
@@ -2546,19 +2571,23 @@
   function createKeywordDragPreview(chip) {
     const preview = document.createElement("div");
     preview.className = "keyword-drag-preview";
-    // 모바일 터치 드래그는 손가락 좌표와 미리보기 중심을 정확히 맞춘다.
+    // 마우스/터치/펜 모두 포인터 좌표와 미리보기 중심을 정확히 맞춘다.
     preview.style.transform = "translate(-50%, -50%)";
     const previewChip = chip.cloneNode(true);
     previewChip.classList.add("selected");
     preview.appendChild(previewChip);
-    document.body.appendChild(preview);
+    // #app은 position: fixed로 별도 stacking context를 만든다.
+    // 프리뷰를 body에 붙이면 #app 내부의 게임 커서보다 위에 표시될 수 있으므로
+    // 게임 커서와 같은 stacking context인 #app 안에 추가한다.
+    const previewParent = $("app") || document.body;
+    previewParent.appendChild(preview);
     return preview;
   }
 
   function startKeywordPointerDrag(e, chip, word) {
-    // PC 마우스는 기존 HTML5 drag/drop을 사용하고,
-    // 모바일 터치와 펜 입력만 Pointer Events로 직접 처리한다.
-    if (e.pointerType === "mouse") return;
+    // 브라우저 기본 HTML5 drag/drop은 PC에서 운영체제 커서를 다시 표시할 수 있다.
+    // 마우스/터치/펜 모두 Pointer Events로 통일해 게임 커서만 유지한다.
+    if (e.pointerType === "mouse" && e.button !== 0) return;
 
     keywordPointerDrag = {
       pointerId: e.pointerId,
@@ -2598,6 +2627,9 @@
     if (!dragInfo || e.pointerId !== dragInfo.pointerId) return;
 
     keywordPointerDrag = null;
+    if (dragInfo.chip.hasPointerCapture?.(e.pointerId)) {
+      dragInfo.chip.releasePointerCapture?.(e.pointerId);
+    }
     dragInfo.preview?.remove();
 
     if (dragInfo.moved) {
@@ -2659,27 +2691,9 @@
       const chip = document.createElement("button");
       chip.className = "keyword-chip";
       chip.textContent = word;
-      chip.draggable = true;
+      // 네이티브 드래그를 끄고 커스텀 Pointer Events 드래그만 사용한다.
+      chip.draggable = false;
       chip.addEventListener("pointerdown", (e) => startKeywordPointerDrag(e, chip, word));
-      chip.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("text/plain", word);
-        selectedKeyword = word;
-        updateKeywordSelection();
-
-        const preview = document.createElement("div");
-        preview.className = "keyword-drag-preview";
-        const previewChip = chip.cloneNode(true);
-        previewChip.classList.add("selected");
-        preview.appendChild(previewChip);
-        document.body.appendChild(preview);
-
-        e.dataTransfer.setDragImage(
-          preview,
-          preview.offsetWidth / 2,
-          preview.offsetHeight / 2
-        );
-        setTimeout(() => preview.remove(), 0);
-      });
       chip.addEventListener("click", () => {
         if (suppressKeywordClick) return;
         playSfx("flick");
@@ -2719,16 +2733,6 @@
         reasoningSlots[idx] = "";
         renderReasoning();
       }
-    });
-    slot.addEventListener("dragover", e => {
-      e.preventDefault();
-    });
-    slot.addEventListener("drop", e => {
-      e.preventDefault();
-      reasoningSlots[idx] = e.dataTransfer.getData("text/plain");
-      selectedKeyword = null;
-      playSfx("flick");
-      renderReasoning();
     });
     return slot;
   }
@@ -3779,15 +3783,13 @@
   document.addEventListener("pointerout", (e) => {
     if (e.pointerType && e.pointerType !== "mouse") return;
     if (e.relatedTarget) return;
-    const cursor = $("gameCursor");
-    if (cursor) cursor.style.opacity = "0";
+    hideGameCursor();
   }, {passive:true});
   window.addEventListener("blur", () => {
     clearTimeout(gameCursorReleaseTimer);
     gameCursorReleaseTimer = null;
     gameCursorPressed = false;
-    const cursor = $("gameCursor");
-    if (cursor) cursor.style.opacity = "0";
+    hideGameCursor();
 
     // 다른 브라우저 탭뿐 아니라 다른 앱/윈도우로 전환해도 BGM을 멈춘다.
     pauseBgmForBackground();
@@ -3910,7 +3912,11 @@
   document.addEventListener("selectstart", e => e.preventDefault());
   document.addEventListener("contextmenu", e => e.preventDefault());
   document.addEventListener("dragstart", e => {
-    if (e.target instanceof HTMLImageElement) e.preventDefault();
+    // 이미지와 추리 키워드의 브라우저 기본 드래그를 모두 차단한다.
+    // 특히 키워드 네이티브 드래그는 시스템 커서를 다시 표시할 수 있다.
+    if (e.target instanceof HTMLImageElement || (e.target instanceof Element && e.target.closest(".keyword-chip"))) {
+      e.preventDefault();
+    }
   });
   document.addEventListener("dblclick", e => e.preventDefault(), {passive:false});
   document.addEventListener("wheel", e => {
