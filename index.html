@@ -1128,8 +1128,8 @@
   }
   #clearTranslation {
     max-width: min(92vw, 700px);
-    margin: clamp(14px, 2vh, 24px) 0 0;
-    font-size: calc(clamp(20px, 2.1vw, 30px) - 2px);
+    margin: clamp(20px, 3vh, 32px) 0 0;
+    font-size: calc(clamp(20px, 2.1vw, 30px) - 5px);
     font-weight: 500;
     color: rgba(255,255,255,.82);
     line-height: 1.45;
@@ -1167,6 +1167,8 @@
     transition: opacity .65s ease;
   }
   #fade.on { opacity: 1; pointer-events: auto; }
+  /* 진엔딩 마지막 장면에서 타이틀로 돌아갈 때만 사용하는 2배 길이 페이드 */
+  #fade.true-ending-slow { transition-duration: 1.3s; }
 
   /* PC 게임 커서: 브라우저 기본 커서를 숨기고 리소스를 직접 따라다니게 한다. */
   #gameCursor {
@@ -1279,7 +1281,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.74</div>
+    <div id="versionLabel">v0.75</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1820,8 +1822,13 @@
     $("strangeHatButton").textContent = `이상한 모자 ${state.strangeHatOn ? "ON" : "OFF"}`;
   }
 
-  function fadeToBlack(callback) {
-    $("fade").classList.add("on");
+  function fadeToBlack(callback, useTrueEndingSlowFade = false) {
+    const fade = $("fade");
+    const fadeOutWaitMs = useTrueEndingSlowFade ? 1400 : 700;
+    const fadeInDurationMs = useTrueEndingSlowFade ? 1300 : 650;
+
+    fade.classList.toggle("true-ending-slow", useTrueEndingSlowFade);
+    fade.classList.add("on");
     setTimeout(async () => {
       try {
         // 콜백이 이미지 로드/디코딩 Promise를 반환하면 완료될 때까지 검은 화면을 유지한다.
@@ -1829,10 +1836,16 @@
       } finally {
         // 새 장면이 실제로 한 프레임 그려진 뒤 페이드를 해제해 순간적인 깜박임을 막는다.
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => $("fade").classList.remove("on"));
+          requestAnimationFrame(() => {
+            fade.classList.remove("on");
+            if (useTrueEndingSlowFade) {
+              // 느린 페이드인이 끝난 뒤 공통 페이드 시간으로 되돌린다.
+              setTimeout(() => fade.classList.remove("true-ending-slow"), fadeInDurationMs + 50);
+            }
+          });
         });
       }
-    }, 700);
+    }, fadeOutWaitMs);
   }
 
   function fitToastToViewport(el) {
@@ -3113,9 +3126,10 @@
     }));
 
     if (isPerfect) {
+      // 100점 전용: 오목눈이/말풍선 후 2초 뒤 번역, 다시 1초 뒤 확인 버튼을 노출한다.
       scheduleClearReveal("clearCommentRow", 5600);
-      scheduleClearReveal("clearTranslation", 5900);
-      scheduleClearReveal("clearActions", 6500, () => {
+      scheduleClearReveal("clearTranslation", 7600);
+      scheduleClearReveal("clearActions", 8600, () => {
         $("clearConfirm").disabled = false;
       });
     } else {
@@ -3199,7 +3213,7 @@
   }
 
   function finishTrueEnding() {
-    goTitleAfterClear();
+    goTitleAfterClear(true);
   }
 
   function startTrueEnding() {
@@ -3322,7 +3336,7 @@
     });
   }
 
-  function goTitleAfterClear() {
+  function goTitleAfterClear(useTrueEndingSlowFade = false) {
     state.completed = true;
     state.runActive = false;
     saveState();
@@ -3356,7 +3370,7 @@
           }
         }, 720);
       }
-    });
+    }, useTrueEndingSlowFade);
   }
 
   function beginFromTitle() {
