@@ -303,12 +303,34 @@
     object-fit: cover;
     object-position: center center;
   }
-  #startSnow {
+  #startSnow,
+  #endingSnow {
     position: absolute;
     inset: 0;
     z-index: 1;
     overflow: visible;
     pointer-events: none;
+  }
+
+  /* True ending */
+  #trueEndingScreen {
+    position: absolute;
+    inset: 0;
+    z-index: 55;
+    overflow: hidden;
+    background: #000;
+  }
+  #trueEndingBg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    pointer-events: none;
+  }
+  #endingSnow {
+    z-index: 1;
   }
   .title-snowflake {
     position: absolute;
@@ -603,6 +625,7 @@
   }
   #speakerName.doguri { color: var(--doguri); }
   #speakerName.mung { color: var(--mung); }
+  #speakerName.unknown { color: #929292; }
   #dialogueText {
     font-size: clamp(22px, 2.4vw, 38px);
     line-height: 1.5;
@@ -795,6 +818,18 @@
     background: rgba(0,0,0,.55);
     color: #fff;
     white-space: nowrap;
+  }
+  #clueHintNotice {
+    width: 96%;
+    margin: 16px auto 0;
+    color: rgba(255,255,255,.8);
+    font-size: min(14px, 2.75vw);
+    line-height: 1.3;
+    letter-spacing: -.025em;
+    text-align: center;
+    white-space: nowrap;
+    overflow: visible;
+    pointer-events: none;
   }
   #cluePopup .popup-actions { margin-top: 32px; }
   #cluePopup .action-btn { min-height: 48px; padding: 10px 22px; }
@@ -1227,7 +1262,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.67</div>
+    <div id="versionLabel">v0.68</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1248,6 +1283,11 @@
     </div>
     <img id="startDoguri" src="images/doguri_title.png" alt="" draggable="false" />
     <div id="startPrompt" class="serif">화면을 눌러 게임을 시작하세요.</div>
+  </div>
+
+  <div id="trueEndingScreen" class="hidden" aria-hidden="true">
+    <img id="trueEndingBg" src="images/bg_e_01.png" alt="" draggable="false" />
+    <div id="endingSnow" class="hidden" aria-hidden="true"></div>
   </div>
 
   <div id="introScreen" class="hidden">
@@ -1318,6 +1358,7 @@
   <div id="cluePopup" class="popup hidden">
     <div id="clueGrid"></div>
     <div id="clueKeywords"></div>
+    <div id="clueHintNotice">힌트 보기를 사용하면 미발견 단서 1개의 이름이 공개됩니다.</div>
     <div class="popup-actions">
       <button id="clueCancelButton" class="action-btn hidden">취소</button>
       <button id="cluePresentButton" class="action-btn hidden">제시한다</button>
@@ -1550,6 +1591,7 @@
   let newGameConfirmFromSettings = false;
   let windowVisualDelayActive = false;
   let windowClosedHideTimer = null;
+  let lastClearScore = null;
 
   const audio = {
     bgm: new Audio(),
@@ -2224,7 +2266,7 @@
     $("dialogueBlocker").classList.remove("hidden");
     $("dialogueBox").classList.remove("hidden");
     $("backButton").classList.add("hidden");
-    $("characterLayer").classList.remove("hidden");
+    $("characterLayer").classList.toggle("hidden", dialogue.mode === "ending");
     showDialogueLine();
     updateHotspots();
   }
@@ -2232,13 +2274,17 @@
   function showDialogueLine() {
     const item = dialogue.entries[dialogue.index];
     const isDoguri = item.speaker === "도구리";
+    const isUnknown = item.speaker === "???";
+    const speakerClass = isDoguri ? "doguri" : isUnknown ? "unknown" : "mung";
     $("speakerName").textContent = item.speaker;
-    $("speakerName").className = isDoguri ? "doguri" : "mung";
+    $("speakerName").className = speakerClass;
     $("dialogueText").textContent = item.text;
-    $("dialogueText").className = `${item.thought ? "thought " : ""}${isDoguri ? "doguri" : "mung"}`.trim();
+    $("dialogueText").className = `${item.thought ? "thought " : ""}${speakerClass}`.trim();
     $("nextMark").classList.remove("hidden");
 
     ["mungCenter","doguriLeft","mungRight"].forEach(id => $(id).classList.add("hidden"));
+    if (dialogue.mode === "ending") return;
+
     if (dialogue.mode === "first") {
       if (!isDoguri) $("mungCenter").classList.remove("hidden");
     } else {
@@ -2331,7 +2377,9 @@
     $("clueConfirmButton").classList.add("hidden");
 
     const keywordWrap = $("clueKeywords");
+    const hintNotice = $("clueHintNotice");
     keywordWrap.classList.toggle("hidden", mode === "present");
+    hintNotice.classList.toggle("hidden", mode === "present");
     keywordWrap.innerHTML = "";
     if (mode !== "present") {
       getSortedKeywords(state.keywords).forEach(keyword => {
@@ -2738,12 +2786,12 @@
     }, 450);
   }
 
-  function buildTitleSnow() {
-    const layer = $("startSnow");
+  function buildDirectionalSnow(layer, direction = -1) {
     if (!layer || layer.childElementCount > 0) return;
 
     const pieceCount = 168;
     const pathRatios = [.16, .33, .5, .67, .84];
+    const driftDirection = direction < 0 ? -1 : 1;
 
     for (let i = 0; i < pieceCount; i++) {
       const flake = document.createElement("span");
@@ -2755,7 +2803,7 @@
       const flakeH = size * (.84 + Math.random() * .22);
       const duration = 1800 + (1 - depth) * 2600 + Math.random() * 900;
       const delay = -Math.random() * duration;
-      const driftX = -(58 + depth * 52 + Math.random() * 82);
+      const driftX = driftDirection * (58 + depth * 52 + Math.random() * 82);
       const fallY = 116 + Math.random() * 42;
       const startY = -10 - Math.random() * 24;
       const alpha = 0.44 + depth * 0.5;
@@ -2786,9 +2834,11 @@
         flake.style.setProperty(`--rot-${index + 1}`, `${rot.toFixed(2)}deg`);
       });
 
-      // 왼쪽으로 크게 날아가므로 화면 오른쪽 바깥에서도 눈을 생성해
-      // 아래쪽까지 내려왔을 때 우하단이 비지 않도록 한다.
-      const startX = -14 + Math.random() * (122 + Math.abs(driftX));
+      // 진행 방향 반대편 바깥에서도 생성해 화면 가장자리가 비지 않도록 한다.
+      const driftAbs = Math.abs(driftX);
+      const startX = driftDirection < 0
+        ? -14 + Math.random() * (122 + driftAbs)
+        : -14 - driftAbs + Math.random() * (122 + driftAbs);
       flake.style.setProperty("--x", `${startX.toFixed(2)}vw`);
       flake.style.setProperty("--start-y", `${startY.toFixed(2)}vh`);
       flake.style.setProperty("--flake-w", `${flakeW.toFixed(2)}px`);
@@ -2803,6 +2853,14 @@
       flake.style.setProperty("--rot-6", `${flightAngle.toFixed(2)}deg`);
       layer.appendChild(flake);
     }
+  }
+
+  function buildTitleSnow() {
+    buildDirectionalSnow($("startSnow"), -1);
+  }
+
+  function buildEndingSnow() {
+    buildDirectionalSnow($("endingSnow"), 1);
   }
 
   function formatClearTime(ms) {
@@ -2974,6 +3032,7 @@
 
     const count = state.clues.filter(Boolean).length;
     const score = scoreOverride === null ? calculateDeductionScore() : scoreOverride;
+    lastClearScore = score;
     const isPerfect = score === 100;
     const title = $("clearTitle");
     const scoreRow = $("clearScore");
@@ -3034,6 +3093,46 @@
     }
   }
 
+  function setTrueEndingScene(sceneNumber) {
+    const isSecondScene = sceneNumber === 2;
+    $("trueEndingBg").src = isSecondScene ? "images/bg_e_02.png" : "images/bg_e_01.png";
+    $("endingSnow").classList.toggle("hidden", !isSecondScene);
+  }
+
+  function showTrueEndingScene2() {
+    fadeToBlack(() => {
+      setTrueEndingScene(2);
+      openDialogue([
+        {speaker:"???", text:"명탐정 도구리… 기억해 두지."}
+      ], {mode:"ending", onComplete:finishTrueEnding});
+    });
+  }
+
+  function finishTrueEnding() {
+    goTitleAfterClear();
+  }
+
+  function startTrueEnding() {
+    stopClearResultAnimations();
+    fadeToBlack(() => {
+      closeAllPopups();
+      setSceneVisible(false);
+      $("initialScreen").classList.add("hidden");
+      $("startScreen").classList.add("hidden");
+      $("introScreen").classList.add("hidden");
+      $("trueEndingScreen").classList.remove("hidden");
+      $("trueEndingScreen").setAttribute("aria-hidden", "false");
+      setTrueEndingScene(1);
+      currentMode = "trueEnding";
+      transitionBgm("bgm_e.mp3", 700);
+      openDialogue([
+        {speaker:"???", text:"...역시 들켰군."},
+        {speaker:"???", text:"멍청한 형사는 속였지만..."},
+        {speaker:"???", text:"저 작은 너구리는 예상 밖이었어."}
+      ], {mode:"ending", onComplete:showTrueEndingScene2});
+    });
+  }
+
   function updateTestModeControls() {
     const hidden = !SHOW_TEST_MODE_CONTROLS;
     $("testResetButton").classList.toggle("hidden", hidden);
@@ -3059,6 +3158,7 @@
     testModeEnabled = false;
     testModeScore = 100;
     pendingStrangeHatAcquireToast = false;
+    lastClearScore = null;
     $("testScoreSelect").value = "100";
 
     applyStrangeHat();
@@ -3139,10 +3239,14 @@
 
     const shouldShowStrangeHatToast = pendingStrangeHatAcquireToast;
     pendingStrangeHatAcquireToast = false;
+    lastClearScore = null;
 
     fadeToBlack(() => {
       closeAllPopups();
       setSceneVisible(false);
+      $("trueEndingScreen").classList.add("hidden");
+      $("trueEndingScreen").setAttribute("aria-hidden", "true");
+      $("endingSnow").classList.add("hidden");
       $("initialScreen").classList.add("hidden");
       $("startScreen").classList.remove("hidden");
       $("startPrompt").classList.remove("hidden");
@@ -3514,7 +3618,8 @@
 
     if (isVisible("clearPopup")) {
       playSfx("confirm");
-      goTitleAfterClear();
+      if (lastClearScore === 100) startTrueEnding();
+      else goTitleAfterClear();
     }
   }
 
@@ -3711,7 +3816,8 @@
   $("clearConfirm").addEventListener("click", () => {
     if ($("clearConfirm").disabled || !$("clearActions").classList.contains("show")) return;
     playSfx("confirm");
-    goTitleAfterClear();
+    if (lastClearScore === 100) startTrueEnding();
+    else goTitleAfterClear();
   });
 
   window.addEventListener("keydown", (e) => {
@@ -3813,6 +3919,7 @@
 
   // Initialize
   buildTitleSnow();
+  buildEndingSnow();
   buildHotspots();
   syncStartSubtitleToTitleImage();
   resizeScene();
