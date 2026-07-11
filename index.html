@@ -64,6 +64,8 @@
   }
   #app, #app * {
     cursor: url("images/cursor_default.png") 64 64, auto;
+    /* iPad Safari에서도 터치 대상 요소 자체가 확대 제스처를 시작하지 못하게 한다. */
+    touch-action: none;
   }
   #sceneViewport.cursor-investigate,
   #sceneViewport.cursor-investigate * {
@@ -494,8 +496,16 @@
     line-height: 1.65;
     opacity: 0;
     transition: opacity .6s ease;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
   #introText.show { opacity: 1; }
+  /* 문장 교체 순간 기존 Safari 텍스트 합성 레이어를 완전히 제거한다. */
+  #introText.switching {
+    display: none;
+    opacity: 0 !important;
+    transition: none !important;
+  }
 
   /* Main UI */
   #mainUi {
@@ -1269,7 +1279,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.73</div>
+    <div id="versionLabel">v0.74</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1596,6 +1606,7 @@
   let introBusy = false;
   let introAdvanceTimer = null;
   let introShowRaf = null;
+  let introTransitionEndHandler = null;
   let bgmResumeAfterVisibility = false;
   let testModeEnabled = false;
   let testModeScore = 100;
@@ -1624,6 +1635,8 @@
     }
   };
   const BGM_VOLUME = .72;
+  // 창문을 연 뒤 오목눈이가 다시 등장할 때까지의 간격(ms)
+  const BIRD_APPEAR_INTERVAL_MS = 30000;
   // 100점 도달 후 전용 효과음 재생까지의 지연 시간(ms)
   const CLEAR_100_SFX_DELAY = 850;
   audio.bgm.loop = true;
@@ -2219,7 +2232,7 @@
     birdTimeout = setTimeout(() => {
       birdTimeout = null;
       runBirdSequence();
-    }, 60000);
+    }, BIRD_APPEAR_INTERVAL_MS);
   }
 
   function setBirdFrame(frame) {
@@ -3411,6 +3424,10 @@
       cancelAnimationFrame(introShowRaf);
       introShowRaf = null;
     }
+    if (introTransitionEndHandler) {
+      $("introText").removeEventListener("transitionend", introTransitionEndHandler);
+      introTransitionEndHandler = null;
+    }
   }
 
   function playIntro() {
@@ -3436,13 +3453,22 @@
     const el = $("introText");
     if (introShowRaf !== null) cancelAnimationFrame(introShowRaf);
 
-    // 이전 문장이 완전히 투명한 상태에서만 텍스트를 교체해 합성 잔상을 방지한다.
+    // Safari가 이전 글자 합성 레이어를 재사용하지 않도록 한 프레임 동안 요소를 제거한 뒤 교체한다.
     el.classList.remove("show");
+    el.classList.add("switching");
     el.textContent = introLines[introIndex] || "";
     void el.offsetWidth;
+
     introShowRaf = requestAnimationFrame(() => {
       introShowRaf = null;
-      if (currentMode === "intro") el.classList.add("show");
+      if (currentMode !== "intro") return;
+      el.classList.remove("switching");
+      void el.offsetWidth;
+
+      introShowRaf = requestAnimationFrame(() => {
+        introShowRaf = null;
+        if (currentMode === "intro") el.classList.add("show");
+      });
     });
   }
 
@@ -3457,25 +3483,40 @@
       cancelAnimationFrame(introShowRaf);
       introShowRaf = null;
     }
+    el.classList.remove("switching");
     el.classList.remove("show");
 
-    // CSS opacity 전환(.6s)이 끝난 뒤 문장을 교체한다.
-    // 기존 320ms 교체는 일부 브라우저에서 이전 글자 레이어가 남아 겹쳐 보일 수 있었다.
-    clearTimeout(introAdvanceTimer);
-    introAdvanceTimer = setTimeout(() => {
+    const completeFadeOut = () => {
+      if (!introBusy) return;
+      introBusy = false;
+      clearTimeout(introAdvanceTimer);
       introAdvanceTimer = null;
+      if (introTransitionEndHandler) {
+        el.removeEventListener("transitionend", introTransitionEndHandler);
+        introTransitionEndHandler = null;
+      }
       if (currentMode !== "intro") return;
 
       introIndex++;
       if (introIndex < introLines.length) {
         showIntroLine();
-        introBusy = false;
       } else {
         currentMode = "introTransition";
         clearIntroTransitionJobs();
         startOpeningDialogue();
       }
-    }, 650);
+    };
+
+    // 고정 시간만 믿지 않고 실제 opacity transition 종료를 기준으로 다음 문장으로 넘어간다.
+    introTransitionEndHandler = (event) => {
+      if (event.target === el && event.propertyName === "opacity") completeFadeOut();
+    };
+    el.addEventListener("transitionend", introTransitionEndHandler);
+
+    // 전환 이벤트가 누락되는 Safari 예외 상황을 위한 안전장치.
+    clearTimeout(introAdvanceTimer);
+    const alreadyHidden = Number.parseFloat(getComputedStyle(el).opacity) <= 0.001;
+    introAdvanceTimer = setTimeout(completeFadeOut, alreadyHidden ? 0 : 850);
   }
 
   function startOpeningDialogue() {
@@ -3982,6 +4023,35 @@
   document.addEventListener("touchmove", e => {
     if (e.touches.length > 1) e.preventDefault();
   }, {passive:false});
+
+  // iPad Safari는 dblclick 이벤트 전에 빠른 연속 탭을 스마트 줌으로 처리할 수 있다.
+  // 같은 위치의 두 번째 touchend만 차단해 일반적인 한 번 탭은 그대로 유지한다.
+  let lastTouchEndAt = 0;
+  let lastTouchEndX = 0;
+  let lastTouchEndY = 0;
+  document.addEventListener("touchend", e => {
+    if (e.touches.length > 0 || e.changedTouches.length !== 1) {
+      lastTouchEndAt = 0;
+      return;
+    }
+
+    const touch = e.changedTouches[0];
+    const now = performance.now();
+    const elapsed = now - lastTouchEndAt;
+    const distance = Math.hypot(touch.clientX - lastTouchEndX, touch.clientY - lastTouchEndY);
+    const isDoubleTap = elapsed > 0 && elapsed < 320 && distance < 36;
+
+    if (isDoubleTap) {
+      e.preventDefault();
+      lastTouchEndAt = 0;
+      return;
+    }
+
+    lastTouchEndAt = now;
+    lastTouchEndX = touch.clientX;
+    lastTouchEndY = touch.clientY;
+  }, {passive:false, capture:true});
+
   document.addEventListener("selectstart", e => e.preventDefault());
   document.addEventListener("contextmenu", e => e.preventDefault());
   document.addEventListener("dragstart", e => {
