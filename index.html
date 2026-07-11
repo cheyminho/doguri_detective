@@ -1265,7 +1265,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.7</div>
+    <div id="versionLabel">v0.71</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1616,10 +1616,13 @@
       wrong:new Audio("sfx/sfx_wrong.wav"),
       windowopen:new Audio("sfx/sfx_windowopen.wav"),
       toast:new Audio("sfx/sfx_toast.wav"),
-      applause:new Audio("sfx/sfx_applause.wav")
+      applause:new Audio("sfx/sfx_applause.wav"),
+      clear100:new Audio("sfx/sfx_clear_100.wav")
     }
   };
   const BGM_VOLUME = .72;
+  // 100점 도달 후 전용 효과음 재생까지의 지연 시간(ms)
+  const CLEAR_100_SFX_DELAY = 850;
   audio.bgm.loop = true;
   audio.bgm.volume = BGM_VOLUME;
   audio.sfx.applause.volume = .65;
@@ -2947,12 +2950,23 @@
   function animateDeductionScore(target, duration = 3000, onComplete = null) {
     const el = $("clearScoreValue");
     const startedAt = performance.now();
+    let clear100Played = false;
     el.textContent = "0";
 
     const tick = (now) => {
       const t = Math.min(1, (now - startedAt) / duration);
       const eased = 1 - Math.pow(1 - t, 4);
-      el.textContent = String(Math.round(target * eased));
+      const displayedScore = Math.round(target * eased);
+      el.textContent = String(displayedScore);
+
+      if (target === 100 && displayedScore === 100 && !clear100Played) {
+        clear100Played = true;
+        const clear100Timer = setTimeout(() => {
+          playSfx("clear100");
+        }, CLEAR_100_SFX_DELAY);
+        clearRevealTimers.push(clear100Timer);
+      }
+
       if (t < 1) {
         clearScoreRaf = requestAnimationFrame(tick);
       } else {
