@@ -97,7 +97,9 @@
   }
 
   .hidden { display: none !important; }
-  .serif { font-family: Georgia, "Times New Roman", "Noto Serif KR", serif; }
+  .serif {
+    font-family: "AppleMyungjo", "Noto Serif KR", "Nanum Myeongjo", "Batang", "Times New Roman", serif;
+  }
 
   /* Shared scene */
   #sceneViewport {
@@ -1127,6 +1129,7 @@
     flex: 0 0 auto;
   }
   #clearTranslation {
+    font-family: "AppleMyungjo", "Noto Serif KR", "Nanum Myeongjo", "Batang", "Times New Roman", serif;
     max-width: min(92vw, 700px);
     margin: clamp(20px, 3vh, 32px) 0 0;
     font-size: calc(clamp(20px, 2.1vw, 30px) - 5px);
@@ -1281,7 +1284,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.75</div>
+    <div id="versionLabel">v0.76</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
