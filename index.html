@@ -20,6 +20,10 @@
 <meta name="twitter:title" content="명탐정 도구리" />
 <meta name="twitter:description" content="겨울 산장 살인 사건" />
 <meta name="twitter:image" content="images/thumb_0.png" />
+
+<!-- 진엔딩 장면 전환 시 온라인 환경에서도 이미지가 늦게 뜨지 않도록 미리 요청합니다. -->
+<link rel="preload" as="image" href="images/bg_e_01.png" />
+<link rel="preload" as="image" href="images/bg_e_02.png" />
 <style>
   :root {
     --doguri: #f79f92;
@@ -1265,7 +1269,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.71</div>
+    <div id="versionLabel">v0.72</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1512,7 +1516,6 @@
   // 첫 문장의 "피해자"는 고정 문구로 표시하고, "발자국"은 빈칸으로 사용한다.
   const finalAnswers = ["술","혹","깨진 꽃병","사고사","연출","사인","자상","범인","책상","고드름","피해자","창문","열쇠","발자국","방문"];
   const finalAcceptedAnswers = finalAnswers.map(word => [word]);
-  finalAcceptedAnswers[0] = ["술", "바나나"];
   finalAcceptedAnswers[2] = ["깨진 꽃병", "술"];
   const finalTemplate = [
     ["피해자는 "," 때문에 넘어진 것이 아니다."],
@@ -1806,9 +1809,16 @@
 
   function fadeToBlack(callback) {
     $("fade").classList.add("on");
-    setTimeout(() => {
-      callback?.();
-      requestAnimationFrame(() => $("fade").classList.remove("on"));
+    setTimeout(async () => {
+      try {
+        // 콜백이 이미지 로드/디코딩 Promise를 반환하면 완료될 때까지 검은 화면을 유지한다.
+        await callback?.();
+      } finally {
+        // 새 장면이 실제로 한 프레임 그려진 뒤 페이드를 해제해 순간적인 깜박임을 막는다.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => $("fade").classList.remove("on"));
+        });
+      }
     }, 700);
   }
 
@@ -3111,15 +3121,64 @@
     }
   }
 
-  function setTrueEndingScene(sceneNumber) {
+  const TRUE_ENDING_BG_SOURCES = {
+    1: "images/bg_e_01.png",
+    2: "images/bg_e_02.png"
+  };
+  const trueEndingImagePreloads = new Map();
+
+  function preloadTrueEndingImage(sceneNumber) {
+    const src = TRUE_ENDING_BG_SOURCES[sceneNumber];
+    if (!src) return Promise.resolve();
+    if (trueEndingImagePreloads.has(src)) return trueEndingImagePreloads.get(src);
+
+    const preloadPromise = new Promise(resolve => {
+      const image = new Image();
+      image.decoding = "async";
+      let settled = false;
+
+      const finish = async () => {
+        if (settled) return;
+        settled = true;
+        try {
+          if (typeof image.decode === "function") await image.decode();
+        } catch (e) {}
+        resolve();
+      };
+
+      image.addEventListener("load", finish, {once:true});
+      image.addEventListener("error", finish, {once:true});
+      image.src = src;
+      if (image.complete) finish();
+    });
+
+    trueEndingImagePreloads.set(src, preloadPromise);
+    return preloadPromise;
+  }
+
+  function preloadTrueEndingImages() {
+    preloadTrueEndingImage(1);
+    preloadTrueEndingImage(2);
+  }
+
+  async function setTrueEndingScene(sceneNumber) {
     const isSecondScene = sceneNumber === 2;
-    $("trueEndingBg").src = isSecondScene ? "images/bg_e_02.png" : "images/bg_e_01.png";
+    const src = TRUE_ENDING_BG_SOURCES[sceneNumber] || TRUE_ENDING_BG_SOURCES[1];
+    const background = $("trueEndingBg");
+
+    // 네트워크 다운로드와 이미지 디코딩이 끝난 뒤 실제 화면 소스를 교체한다.
+    await preloadTrueEndingImage(sceneNumber);
+    if (background.getAttribute("src") !== src) background.src = src;
+    try {
+      if (typeof background.decode === "function") await background.decode();
+    } catch (e) {}
+
     $("endingSnow").classList.toggle("hidden", !isSecondScene);
   }
 
   function showTrueEndingScene2() {
-    fadeToBlack(() => {
-      setTrueEndingScene(2);
+    fadeToBlack(async () => {
+      await setTrueEndingScene(2);
       openDialogue([
         {speaker:"???", text:"명탐정 도구리… 기억해 두지."}
       ], {mode:"ending", onComplete:finishTrueEnding});
@@ -3132,15 +3191,15 @@
 
   function startTrueEnding() {
     stopClearResultAnimations();
-    fadeToBlack(() => {
+    fadeToBlack(async () => {
       closeAllPopups();
       setSceneVisible(false);
       $("initialScreen").classList.add("hidden");
       $("startScreen").classList.add("hidden");
       $("introScreen").classList.add("hidden");
+      await setTrueEndingScene(1);
       $("trueEndingScreen").classList.remove("hidden");
       $("trueEndingScreen").setAttribute("aria-hidden", "false");
-      setTrueEndingScene(1);
       currentMode = "trueEnding";
       transitionBgm("bgm_e.mp3", 700);
       openDialogue([
@@ -3938,6 +3997,7 @@
   }, {passive:false});
 
   // Initialize
+  preloadTrueEndingImages();
   buildTitleSnow();
   buildEndingSnow();
   buildHotspots();
