@@ -744,6 +744,10 @@
   }
   #toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
   #toast.title-toast { z-index: 105; }
+  #toast.score-change-toast {
+    background: rgba(0,0,0,.92);
+    color: #fff;
+  }
   #toast .toast-score-gain { color: #02A3F4; }
   #toast .toast-score-loss { color: #F95414; }
 
@@ -1285,7 +1289,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.78</div>
+    <div id="versionLabel">v0.79</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1460,7 +1464,7 @@
   const clueData = [
     { name:"고드름", keywords:["고드름"], lines:["이 정도면 고드름이 아니라 얼음 창인데…"], rect:[1127,72,1320,187], special:"icicle" },
     { name:"그림 액자", keywords:["사인"], lines:["멋진 그림이네… 친필 사인까지 있어."], rect:[427,21,607,209] },
-    { name:"깨진 꽃병", keywords:["깨진 꽃병","연출"], lines:["극적인 연출이네…"], rect:[1242,693,1431,867] },
+    { name:"깨진 꽃병", keywords:["깨진 꽃병","연출"], lines:["연출이 꽤 극적이네… 조각에 베일 것 같아."], rect:[1242,693,1431,867] },
     { name:"다잉 메시지", keywords:["사고사"], lines:["사고사는 너무 친절한 마지막 말인데…"], rect:[295,647,517,740] },
     { name:"목재", keywords:["목재"], lines:["짤막한 나뭇가지. 이파리는 마지막 남은 자존심인가."], rect:[1053,556,1127,638] },
     { name:"문고리", keywords:["방문"], lines:["발견 당시 잠겨 있던 방문이다.","잠금 장치를 누른 채 닫으면, 밖에서는 열리지 않는 구조네."], rect:[1621,729,1821,1053] },
@@ -1532,10 +1536,11 @@
   // 첫 문장의 "피해자"는 고정 문구로 표시하고, "발자국"은 빈칸으로 사용한다.
   const finalAnswers = ["술","혹","깨진 꽃병","사고사","연출","사인","자상","범인","책상","고드름","피해자","창문","열쇠","발자국","방문"];
   const finalAcceptedAnswers = finalAnswers.map(word => [word]);
-  finalAcceptedAnswers[2] = ["깨진 꽃병", "술"];
+  finalAcceptedAnswers[0] = ["술", "바나나"];
+  finalAcceptedAnswers[2] = ["깨진 꽃병", "술", "바나나"];
   const finalTemplate = [
     ["피해자는 "," 때문에 넘어진 것이 아니다."],
-    ["머리의 ","과 ","은 ","처럼 보이게 하려는 ","이다."],
+    ["머리의 ","과 바닥의 ","은 ","처럼 보이게 하려는 ","이다."],
     ["진짜 ","은 몸에 난 깊고 좁은 ","."],
     ["","은 흉기를 남기지 않기 위해 "," 위에 올라가, 창밖 처마의 ","을 꺾어 ","를 찔렀다."],
     ["그리고 ","을 잠근 뒤, ","를 숨겼다."],
@@ -1876,7 +1881,7 @@
     el.style.paddingRight = `${Math.max(8, basePaddingRight * scale)}px`;
   }
 
-  function showToastContent(renderContent, duration=TOAST_DURATION_MS, playToastSound=true, showAboveTitle=false) {
+  function showToastContent(renderContent, duration=TOAST_DURATION_MS, playToastSound=true, showAboveTitle=false, isScoreChange=false) {
     clearTimeout(toastTimer);
     if (playToastSound) playSfx("toast");
     const el = $("toast");
@@ -1885,10 +1890,12 @@
     else el.textContent = String(renderContent);
     fitToastToViewport(el);
     el.classList.toggle("title-toast", showAboveTitle);
+    el.classList.toggle("score-change-toast", isScoreChange);
     el.classList.add("show");
     toastTimer = setTimeout(() => {
       el.classList.remove("show");
       el.classList.remove("title-toast");
+      el.classList.remove("score-change-toast");
     }, duration);
   }
 
@@ -1896,14 +1903,14 @@
     showToastContent(text, duration, playToastSound, showAboveTitle);
   }
 
-  function showScoreChangeToast(amount, playToastSound=false) {
+  function showScoreChangeToast(amount, playToastSound=amount > 0) {
     showToastContent((el) => {
       el.append(document.createTextNode("추리력 "));
       const score = document.createElement("span");
       score.className = amount > 0 ? "toast-score-gain" : "toast-score-loss";
       score.textContent = amount > 0 ? `+${amount}` : String(amount);
       el.append(score);
-    }, TOAST_DURATION_MS, playToastSound);
+    }, TOAST_DURATION_MS, playToastSound, false, true);
   }
 
   function hasFinalConsonant(text) {
@@ -1934,7 +1941,7 @@
     const scoreToastOffset = showScoreChange ? TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS : 0;
 
     setTimeout(() => {
-      if (showScoreChange) showScoreChangeToast(3, false);
+      if (showScoreChange) showScoreChangeToast(3);
 
       setTimeout(() => {
         notifyClueAcquired(idx);
@@ -2547,7 +2554,7 @@
       saveState();
       stopBgm();
       playSfx("wrong");
-      if (state.strangeHatOn) showScoreChangeToast(-3, false);
+      if (state.strangeHatOn) showScoreChangeToast(-3);
       openDialogue([
         {speaker:"멍반장", text:"그건 아닌 것 같습니다."},
         {speaker:"멍반장", text:"왜 아닌지는… 조금만 더 생각해보겠습니다."}
@@ -2731,7 +2738,7 @@
 
     const lines = [
       ["피해자는 ", 0, " 때문에 넘어진 것이 아니다."],
-      ["머리의 ", 1, "과 ", 2, "은 ", 3, "처럼 보이게 하려는 ", 4, "이다."],
+      ["머리의 ", 1, "과 바닥의 ", 2, "은 ", 3, "처럼 보이게 하려는 ", 4, "이다."],
       ["진짜 ", 5, "은 몸에 난 깊고 좁은 ", 6, "."],
       [7, "은 흉기를 남기지 않기 위해 ", 8, " 위에 올라가, 창밖 처마의 ", 9, "을 꺾어 ", 10, "를 찔렀다."],
       ["그리고 ", 11, "을 잠근 뒤, ", 12, "를 숨겼다."],
@@ -2829,7 +2836,7 @@
       saveState();
       transitionBgm("bgm_game.mp3", 700);
       playSfx("wrong");
-      if (state.strangeHatOn) showScoreChangeToast(-5, false);
+      if (state.strangeHatOn) showScoreChangeToast(-5);
       openDialogue([
         {speaker:"멍반장", text:"뭔가 놓친 것 같습니다."},
         {speaker:"멍반장", text:"하지만 뭘 놓쳤는지는 놓쳤습니다."}
@@ -3142,7 +3149,6 @@
     updateClearInfoScale();
     playClearConfetti(isPerfect);
     playSfx("applause");
-    playSfx("popup");
 
     scheduleClearReveal("clearTitle", 80);
     scheduleClearReveal("clearClueCount", 520);
@@ -3724,12 +3730,12 @@
 
     const message = hintText();
     if (state.strangeHatOn) {
-      showScoreChangeToast(-1, false);
+      showScoreChangeToast(-1);
       setTimeout(() => {
-        showToast(message, TOAST_DURATION_MS, false);
+        showToast(message, TOAST_DURATION_MS, true);
       }, TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS);
     } else {
-      showToast(message, TOAST_DURATION_MS, false);
+      showToast(message, TOAST_DURATION_MS, true);
     }
   }
 
@@ -3933,7 +3939,13 @@
   $("cluePresentButton").addEventListener("click", submitEvidence);
 
   $("reasoningCancel").addEventListener("click", () => { playSfx("cancel"); cancelReasoning(true); });
-  $("reasoningConfirm").addEventListener("click", submitReasoning);
+  $("reasoningConfirm").addEventListener("click", (e) => {
+    // 추리 완성 확인 버튼 자체는 별도의 클릭/확인 효과음을 재생하지 않는다.
+    // 정답/오답 판정에 따른 결과 효과음은 submitReasoning 내부에서 그대로 처리한다.
+    e.preventDefault();
+    e.stopPropagation();
+    submitReasoning();
+  });
   document.addEventListener("pointermove", moveKeywordPointerDrag, {passive:false});
   document.addEventListener("pointerup", e => finishKeywordPointerDrag(e, false), {passive:false});
   document.addEventListener("pointercancel", e => finishKeywordPointerDrag(e, true), {passive:false});
@@ -3971,7 +3983,7 @@
     $("newGameConfirmPopup").classList.remove("hidden");
   });
   $("hintMainButton").addEventListener("click", () => {
-    playSfx("confirm");
+    playSfx("click");
     useHint();
   });
   $("strangeHatButton").addEventListener("click", () => {
