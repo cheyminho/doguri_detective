@@ -1305,7 +1305,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.88</div>
+    <div id="versionLabel">v0.89</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -2197,7 +2197,6 @@
       {speaker:"도구리", text:"이미 조사한 곳이야.", thought:true}
     ], {
       mode:"first",
-      backgroundDim:false,
       onComplete:()=>setMode("investigate")
     });
   }
@@ -2242,7 +2241,7 @@
     updateHotspots();
 
     const entries = clue.lines.map(line => ({ speaker:"도구리", text:line, thought:true }));
-    openDialogue(entries, { mode:"first", backgroundDim:false, onComplete:() => {
+    openDialogue(entries, { mode:"first", onComplete:() => {
       if (idx === 12 && !state.windowOpen) updateHotspots();
       setMode("investigate");
       notifyClueAcquiredDelayed(idx, completedInvestigation, showScoreChange);
@@ -2279,7 +2278,7 @@
       openDialogue([
         {speaker:"도구리", text:"열쇠가 딱 맞네.", thought:true},
         {speaker:"도구리", text:"누군가 일부러 창문을 잠근 건가…?", thought:true}
-      ], { mode:"first", backgroundDim:!newlyAcquiredWindow, onComplete:() => {
+      ], { mode:"first", onComplete:() => {
         playSfx("windowopen");
         windowVisualDelayActive = true;
         clearTimeout(windowClosedHideTimer);
@@ -2298,7 +2297,7 @@
       openDialogue([
         {speaker:"도구리", text:"창문은 안쪽에서 잠겨 있다.", thought:true},
         {speaker:"도구리", text:"열쇠 구멍이 있지만 열쇠는 보이지 않는다.", thought:true}
-      ], { mode:"first", backgroundDim:!newlyAcquiredWindow, onComplete:() => {
+      ], { mode:"first", onComplete:() => {
         setMode("investigate");
         if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17, completedInvestigation, showScoreChange);
       }});
@@ -2404,13 +2403,17 @@
     };
     $("dialogueBlocker").classList.remove("hidden");
     $("dialogueBox").classList.remove("hidden");
-    // 진엔딩과 조사 단서 관련 대사(수첩 확인, 최초 수집, 재조사 안내)는 딤드 없이 표시한다.
-    const showBackgroundDim = dialogue.mode !== "ending" && options.backgroundDim !== false;
+    // 대사창용 배경 딤드는 기본적으로 사용하지 않고, 멍반장과 대화하는 시퀀스에서만 명시적으로 켠다.
+    const showBackgroundDim = dialogue.mode !== "ending" && options.backgroundDim === true;
     $("sceneDialogueDim").classList.toggle("active", showBackgroundDim);
     $("backButton").classList.add("hidden");
     $("characterLayer").classList.toggle("hidden", dialogue.mode === "ending");
     showDialogueLine();
     updateHotspots();
+  }
+
+  function openMungDialogue(entries, options={}) {
+    openDialogue(entries, {...options, backgroundDim:true});
   }
 
   function showDialogueLine() {
@@ -2553,7 +2556,6 @@
     if (cluePopupMode !== "present") {
       openDialogue(clueData[idx].lines.map(text => ({speaker:"도구리", text, thought:true})), {
         mode:"first",
-        backgroundDim:false,
         onComplete:()=>{}
       });
     }
@@ -2576,7 +2578,7 @@
     if (state.rebuttalStage >= 5) return startFinalLeadIn();
     setMode("conversation");
     const stage = rebuttals[state.rebuttalStage];
-    openDialogue(stage.claim.map(text => ({speaker:"멍반장", text})), {
+    openMungDialogue(stage.claim.map(text => ({speaker:"멍반장", text})), {
       mode:"third",
       onComplete:() => showChoice([
         {label:"지금 반박한다", action:beginObjection},
@@ -2603,7 +2605,7 @@
       stopBgm();
       playSfx("wrong");
       if (state.strangeHatOn) showScoreChangeToast(-3);
-      openDialogue([
+      openMungDialogue([
         {speaker:"멍반장", text:"그건 아닌 것 같습니다."},
         {speaker:"멍반장", text:"왜 아닌지는… 조금만 더 생각해보겠습니다."}
       ], {mode:"third", onComplete:returnToBase});
@@ -2614,7 +2616,7 @@
       objectionBgmTimer = null;
       playBgm("bgm_objection.mp3");
     const response = stage.response(submittedClue);
-    openDialogue(response, {mode:"third", onComplete:() => {
+    openMungDialogue(response, {mode:"third", onComplete:() => {
       state.rebuttalStage++;
       state.chatUpdated = true;
       saveState();
@@ -2635,7 +2637,7 @@
 
   function startFinalLeadIn() {
     setMode("conversation");
-    openDialogue([
+    openMungDialogue([
       {speaker:"멍반장", text:"이쯤 되면 저도 압니다."},
       {speaker:"멍반장", text:"제가 뭔가 모른다는 걸요."}
     ], {mode:"third", onComplete:() => showChoice([
@@ -2885,7 +2887,7 @@
       transitionBgm("bgm_game.mp3", 700);
       playSfx("wrong");
       if (state.strangeHatOn) showScoreChangeToast(-5);
-      openDialogue([
+      openMungDialogue([
         {speaker:"멍반장", text:"뭔가 놓친 것 같습니다."},
         {speaker:"멍반장", text:"하지만 뭘 놓쳤는지는 놓쳤습니다."}
       ], {mode:"third", onComplete:returnToBase});
@@ -2906,7 +2908,7 @@
     transitionBgm("bgm_peace.mp3", 700);
 
     setTimeout(() => {
-      openDialogue([
+      openMungDialogue([
         {speaker:"도구리", text:"이건 단순한 사고가 아니에요."},
         {speaker:"도구리", text:"피해자는 누군가에게 살해당한 거예요."},
         {speaker:"멍반장", text:"사고사가 아니라… 제가 사고를 칠 뻔했네요."}
@@ -3623,7 +3625,7 @@
       setSceneVisible(true);
       setMode("conversation");
       playBgm("bgm_game.mp3");
-      openDialogue([
+      openMungDialogue([
         {speaker:"도구리", text:"으으…", thought:true},
         {speaker:"도구리", text:"사건 현장이라니 조금 무서워…", thought:true},
         {speaker:"멍반장", text:"…도구리 탐정님?"},
