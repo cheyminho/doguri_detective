@@ -112,8 +112,8 @@
   .scene-pan-arrow {
     position: absolute;
     z-index: 18;
-    width: clamp(52px, 6vw, 96px);
-    height: clamp(52px, 6vw, 96px);
+    width: clamp(52px, 6vw, 64px);
+    height: clamp(52px, 6vw, 64px);
     object-fit: contain;
     pointer-events: none;
     opacity: .92;
@@ -614,8 +614,8 @@
     transition: opacity .18s ease;
   }
   #mungCenter { left: 50%; transform: translateX(-50%); }
-  #doguriLeft { left: max(-2vw); height: min(80vh, 1000px); bottom: 40px;}
-  #mungRight { right: max(-4vw); height: min(100vh, 1000px); bottom: 5px;}
+  #doguriLeft { left: max(-2vw); height: min(80vh, 1000px); bottom: 75px;}
+  #mungRight { right: max(-4vw); height: min(100vh, 1000px); bottom: 30px;}
 
   #dialogueBlocker {
     position: absolute;
@@ -624,16 +624,18 @@
     background: transparent;
   }
   #dialogueBox {
+    --dialogue-edge-gap: clamp(20px, 4vw, 60px);
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -6px;
+    left: var(--dialogue-edge-gap);
+    right: var(--dialogue-edge-gap);
+    bottom: 30px;
     min-height: calc(clamp(150px, 23vh, 250px) + clamp(22px, 3vh, 40px) + 24px);
     z-index: 65;
+    overflow: hidden;
     background: rgba(0,0,0,.55);
     -webkit-backdrop-filter: blur(15px);
     backdrop-filter: blur(15px);
-    border-top: 2px solid var(--line);
+    border-radius: clamp(30px, 3vw, 60px);
     padding: 22px clamp(24px, 5vw, 90px) max(28px, calc(env(safe-area-inset-bottom) + 22px));
   }
   #speakerName {
@@ -653,9 +655,9 @@
   #nextMark {
     position: absolute;
     right: clamp(18px, 5vw, 90px);
-    bottom: max(26px, calc(env(safe-area-inset-bottom) + 22px));
-    width: 46px;
-    height: 46px;
+    bottom: 32px;
+    width: clamp(32px, 2.4vw, 64px);
+    height: clamp(32px, 2.4vw, 64px);
     object-fit: contain;
     pointer-events: none;
     animation: bob .9s ease-in-out infinite;
@@ -1243,7 +1245,7 @@
     #dialogueBox { min-height: calc(180px + clamp(22px, 3vh, 40px) + 24px); padding-left: 22px; padding-right: 22px; }
     .character { width: 100vw; height: 100vh; }
     #mungCenter { top: auto; bottom: 88px; }
-    #doguriLeft { top: auto; left: -12vw; bottom: 110px; width: 88vw; height: 78vh; }
+    #doguriLeft { top: auto; left: -12vw; bottom: 130px; width: 88vw; height: 78vh; }
     #mungRight { top: auto; right: -16vw; bottom: 70px; width: 100vw; height: 78vh; }
     #bottomBar { gap: 12px; }
     .icon-btn { width: 70px; height: 70px; }
@@ -1291,7 +1293,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.83</div>
+    <div id="versionLabel">v0.84</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
