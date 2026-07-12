@@ -744,6 +744,8 @@
   }
   #toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
   #toast.title-toast { z-index: 105; }
+  #toast .toast-score-gain { color: #02A3F4; }
+  #toast .toast-score-loss { color: #F95414; }
 
   /* Clue popup */
   #cluePopup {
@@ -1283,7 +1285,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.77</div>
+    <div id="versionLabel">v0.78</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1639,6 +1641,10 @@
     }
   };
   const BGM_VOLUME = .72;
+  // 모든 토스트 팝업의 노출 시간(ms)
+  const TOAST_DURATION_MS = 1500;
+  // 연속 토스트 사이의 짧은 간격(ms)
+  const TOAST_SEQUENCE_GAP_MS = 220;
   // 창문을 연 뒤 오목눈이가 다시 등장할 때까지의 간격(ms)
   const BIRD_APPEAR_INTERVAL_MS = 30000;
   // 100점 도달 후 전용 효과음 재생까지의 지연 시간(ms)
@@ -1870,11 +1876,13 @@
     el.style.paddingRight = `${Math.max(8, basePaddingRight * scale)}px`;
   }
 
-  function showToast(text, duration=2600, playToastSound=true, showAboveTitle=false) {
+  function showToastContent(renderContent, duration=TOAST_DURATION_MS, playToastSound=true, showAboveTitle=false) {
     clearTimeout(toastTimer);
     if (playToastSound) playSfx("toast");
     const el = $("toast");
-    el.textContent = text;
+    el.textContent = "";
+    if (typeof renderContent === "function") renderContent(el);
+    else el.textContent = String(renderContent);
     fitToastToViewport(el);
     el.classList.toggle("title-toast", showAboveTitle);
     el.classList.add("show");
@@ -1882,6 +1890,20 @@
       el.classList.remove("show");
       el.classList.remove("title-toast");
     }, duration);
+  }
+
+  function showToast(text, duration=TOAST_DURATION_MS, playToastSound=true, showAboveTitle=false) {
+    showToastContent(text, duration, playToastSound, showAboveTitle);
+  }
+
+  function showScoreChangeToast(amount, playToastSound=false) {
+    showToastContent((el) => {
+      el.append(document.createTextNode("추리력 "));
+      const score = document.createElement("span");
+      score.className = amount > 0 ? "toast-score-gain" : "toast-score-loss";
+      score.textContent = amount > 0 ? `+${amount}` : String(amount);
+      el.append(score);
+    }, TOAST_DURATION_MS, playToastSound);
   }
 
   function hasFinalConsonant(text) {
@@ -1898,29 +1920,31 @@
     const lastKeyword = clue.keywords.at(-1) || "";
     const particle = hasFinalConsonant(lastKeyword) ? "을" : "를";
     playSfx("found");
-    showToast(`키워드 ${quoted}${particle} 획득했습니다.`, 2600, false);
+    showToast(`키워드 ${quoted}${particle} 획득했습니다.`, TOAST_DURATION_MS, false);
   }
 
   function notifyInvestigationCompleteIfNeeded() {
     if (state.clues.filter(Boolean).length !== 20) return;
-    const duration = 2600;
     playSfx("correct");
-    showToast("현장 조사 100% 완료!", duration, false);
+    showToast("현장 조사 100% 완료!", TOAST_DURATION_MS, false);
   }
 
-  function notifyClueAcquiredDelayed(idx, showInvestigationCompleteAfter = false) {
+  function notifyClueAcquiredDelayed(idx, showInvestigationCompleteAfter = false, showScoreChange = state.strangeHatOn) {
     const delay = 250;
-    const clueToastDuration = 2600;
-    const nextToastGap = 220;
+    const scoreToastOffset = showScoreChange ? TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS : 0;
 
     setTimeout(() => {
-      notifyClueAcquired(idx);
+      if (showScoreChange) showScoreChangeToast(3, false);
 
-      if (showInvestigationCompleteAfter) {
-        setTimeout(() => {
-          notifyInvestigationCompleteIfNeeded();
-        }, clueToastDuration + nextToastGap);
-      }
+      setTimeout(() => {
+        notifyClueAcquired(idx);
+
+        if (showInvestigationCompleteAfter) {
+          setTimeout(() => {
+            notifyInvestigationCompleteIfNeeded();
+          }, TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS);
+        }
+      }, scoreToastOffset);
     }, delay);
   }
 
@@ -2160,6 +2184,7 @@
     });
     state.noteUpdated = true;
     const completedInvestigation = state.clues.every(Boolean);
+    const showScoreChange = state.strangeHatOn;
     saveState();
     updateMenuBadges();
 
@@ -2173,7 +2198,7 @@
     openDialogue(entries, { mode:"first", onComplete:() => {
       if (idx === 12 && !state.windowOpen) updateHotspots();
       setMode("investigate");
-      notifyClueAcquiredDelayed(idx, completedInvestigation);
+      notifyClueAcquiredDelayed(idx, completedInvestigation, showScoreChange);
     }});
   }
 
@@ -2190,6 +2215,7 @@
   function handleWindow() {
     const hasKey = state.clues[12];
     const newlyAcquiredWindow = !state.clues[17];
+    const showScoreChange = state.strangeHatOn;
     let completedInvestigation = false;
     if (newlyAcquiredWindow) {
       state.clues[17] = true;
@@ -2219,7 +2245,7 @@
           windowClosedHideTimer = null;
           updateHotspots();
         }, 250);
-        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17, completedInvestigation);
+        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17, completedInvestigation, showScoreChange);
       }});
     } else {
       openDialogue([
@@ -2227,7 +2253,7 @@
         {speaker:"도구리", text:"열쇠 구멍이 있지만 열쇠는 보이지 않는다.", thought:true}
       ], { mode:"first", onComplete:() => {
         setMode("investigate");
-        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17, completedInvestigation);
+        if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17, completedInvestigation, showScoreChange);
       }});
     }
   }
@@ -2460,14 +2486,14 @@
     $("cluePopup").classList.remove("hidden");
 
     if (mode === "present") {
-      showToast("단서를 선택해서 제시하자.", 2600, false);
+      showToast("단서를 선택해서 제시하자.", TOAST_DURATION_MS, false);
     }
   }
 
   function selectClue(idx) {
     if (!state.clues[idx]) {
       playSfx("cancel");
-      showToast("아직 찾지 못한 단서입니다.", 2600, false);
+      showToast("아직 찾지 못한 단서입니다.", TOAST_DURATION_MS, false);
       return;
     }
     playSfx("flick");
@@ -2521,6 +2547,7 @@
       saveState();
       stopBgm();
       playSfx("wrong");
+      if (state.strangeHatOn) showScoreChangeToast(-3, false);
       openDialogue([
         {speaker:"멍반장", text:"그건 아닌 것 같습니다."},
         {speaker:"멍반장", text:"왜 아닌지는… 조금만 더 생각해보겠습니다."}
@@ -2802,6 +2829,7 @@
       saveState();
       transitionBgm("bgm_game.mp3", 700);
       playSfx("wrong");
+      if (state.strangeHatOn) showScoreChangeToast(-5, false);
       openDialogue([
         {speaker:"멍반장", text:"뭔가 놓친 것 같습니다."},
         {speaker:"멍반장", text:"하지만 뭘 놓쳤는지는 놓쳤습니다."}
@@ -2919,8 +2947,8 @@
     const missingClues = 20 - state.clues.filter(Boolean).length;
     const score = 100
       - missingClues * 3
-      - state.wrongRebuttalCount * 7
-      - state.wrongReasoningCount * 9
+      - state.wrongRebuttalCount * 3
+      - state.wrongReasoningCount * 5
       - state.hintUseCount;
     return Math.max(0, score);
   }
@@ -3368,7 +3396,7 @@
       if (shouldShowStrangeHatToast) {
         setTimeout(() => {
           if (currentMode === "title" && !$("startScreen").classList.contains("hidden")) {
-            showToast("이상한 모자를 획득했습니다.", 2600, true, true);
+            showToast("이상한 모자를 획득했습니다.", TOAST_DURATION_MS, true, true);
           }
         }, 720);
       }
@@ -3693,7 +3721,16 @@
     state.hintUseCount++;
     revealOneHiddenClueName();
     saveState();
-    showToast(hintText(), 2600, false);
+
+    const message = hintText();
+    if (state.strangeHatOn) {
+      showScoreChangeToast(-1, false);
+      setTimeout(() => {
+        showToast(message, TOAST_DURATION_MS, false);
+      }, TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS);
+    } else {
+      showToast(message, TOAST_DURATION_MS, false);
+    }
   }
 
   function isVisible(id) {
