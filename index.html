@@ -1291,7 +1291,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.82</div>
+    <div id="versionLabel">v0.83</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1584,6 +1584,7 @@
   let dialogue = null;
   let dialogueLocked = false;
   let toastTimer = null;
+  let toastStyleCleanupTimer = null;
   let pendingStrangeHatAcquireToast = false;
   let clearRevealTimers = [];
   let clearScoreRaf = null;
@@ -1885,6 +1886,7 @@
 
   function showToastContent(renderContent, duration=TOAST_DURATION_MS, playToastSound=true, showAboveTitle=false, isScoreChange=false) {
     clearTimeout(toastTimer);
+    clearTimeout(toastStyleCleanupTimer);
     if (playToastSound) playSfx("toast");
     const el = $("toast");
     el.textContent = "";
@@ -1895,9 +1897,14 @@
     el.classList.toggle("score-change-toast", isScoreChange);
     el.classList.add("show");
     toastTimer = setTimeout(() => {
+      // 페이드아웃 중에는 현재 토스트의 배경/텍스트 색상을 유지한다.
       el.classList.remove("show");
-      el.classList.remove("title-toast");
-      el.classList.remove("score-change-toast");
+      toastStyleCleanupTimer = setTimeout(() => {
+        if (!el.classList.contains("show")) {
+          el.classList.remove("title-toast");
+          el.classList.remove("score-change-toast");
+        }
+      }, 180);
     }, duration);
   }
 
