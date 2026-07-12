@@ -110,12 +110,19 @@
     background: #000;
     z-index: 1;
   }
-  /* 일반 대화 중 배경 장면만 20% 어둡게 처리한다. */
+  /* 일반 대화 중 배경 장면을 하단 35% → 중앙 20%로 변화시키고, 중앙부터 상단은 20%로 유지한다. */
   .dialogue-background-dim {
+    --dialogue-dim-bottom-opacity: .5;
+    --dialogue-dim-top-opacity: .2;
     position: absolute;
     inset: 0;
     z-index: 17;
-    background: rgba(0, 0, 0, .20);
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, var(--dialogue-dim-bottom-opacity)) 0%,
+      rgba(0, 0, 0, var(--dialogue-dim-top-opacity)) 50%,
+      rgba(0, 0, 0, var(--dialogue-dim-top-opacity)) 100%
+    );
     opacity: 0;
     pointer-events: none;
   }
@@ -1309,7 +1316,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.93</div>
+    <div id="versionLabel">v0.94</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
