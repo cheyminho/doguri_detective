@@ -1305,7 +1305,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.87</div>
+    <div id="versionLabel">v0.88</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -2192,20 +2192,30 @@
     updatePanArrows();
   }
 
+  function showAlreadyInvestigatedDialogue() {
+    openDialogue([
+      {speaker:"도구리", text:"이미 조사한 곳이야.", thought:true}
+    ], {
+      mode:"first",
+      backgroundDim:false,
+      onComplete:()=>setMode("investigate")
+    });
+  }
+
   function handleHotspot(idx) {
     if (currentMode !== "investigate" || dialogueLocked) return;
     const clue = clueData[idx];
 
     if (idx === 17) {
       if (state.windowOpen || (state.clues[17] && !state.clues[12])) {
-        openDialogue([{speaker:"도구리", text:"이미 조사한 곳이야.", thought:true}], {mode:"first", onComplete:()=>setMode("investigate")});
+        showAlreadyInvestigatedDialogue();
       } else {
         handleWindow();
       }
       return;
     }
     if (state.clues[idx]) {
-      openDialogue([{speaker:"도구리", text:"이미 조사한 곳이야.", thought:true}], {mode:"first", onComplete:()=>setMode("investigate")});
+      showAlreadyInvestigatedDialogue();
       return;
     }
     acquireClue(idx);
@@ -2232,7 +2242,7 @@
     updateHotspots();
 
     const entries = clue.lines.map(line => ({ speaker:"도구리", text:line, thought:true }));
-    openDialogue(entries, { mode:"first", onComplete:() => {
+    openDialogue(entries, { mode:"first", backgroundDim:false, onComplete:() => {
       if (idx === 12 && !state.windowOpen) updateHotspots();
       setMode("investigate");
       notifyClueAcquiredDelayed(idx, completedInvestigation, showScoreChange);
@@ -2269,7 +2279,7 @@
       openDialogue([
         {speaker:"도구리", text:"열쇠가 딱 맞네.", thought:true},
         {speaker:"도구리", text:"누군가 일부러 창문을 잠근 건가…?", thought:true}
-      ], { mode:"first", onComplete:() => {
+      ], { mode:"first", backgroundDim:!newlyAcquiredWindow, onComplete:() => {
         playSfx("windowopen");
         windowVisualDelayActive = true;
         clearTimeout(windowClosedHideTimer);
@@ -2288,7 +2298,7 @@
       openDialogue([
         {speaker:"도구리", text:"창문은 안쪽에서 잠겨 있다.", thought:true},
         {speaker:"도구리", text:"열쇠 구멍이 있지만 열쇠는 보이지 않는다.", thought:true}
-      ], { mode:"first", onComplete:() => {
+      ], { mode:"first", backgroundDim:!newlyAcquiredWindow, onComplete:() => {
         setMode("investigate");
         if (newlyAcquiredWindow) notifyClueAcquiredDelayed(17, completedInvestigation, showScoreChange);
       }});
@@ -2394,8 +2404,9 @@
     };
     $("dialogueBlocker").classList.remove("hidden");
     $("dialogueBox").classList.remove("hidden");
-    // 진엔딩을 제외한 일반 대화에서만 배경 딤드를 표시한다.
-    $("sceneDialogueDim").classList.toggle("active", dialogue.mode !== "ending");
+    // 진엔딩과 조사 단서 관련 대사(수첩 확인, 최초 수집, 재조사 안내)는 딤드 없이 표시한다.
+    const showBackgroundDim = dialogue.mode !== "ending" && options.backgroundDim !== false;
+    $("sceneDialogueDim").classList.toggle("active", showBackgroundDim);
     $("backButton").classList.add("hidden");
     $("characterLayer").classList.toggle("hidden", dialogue.mode === "ending");
     showDialogueLine();
@@ -2540,7 +2551,11 @@
     selectedClue = idx;
     updateClueSelection();
     if (cluePopupMode !== "present") {
-      openDialogue(clueData[idx].lines.map(text => ({speaker:"도구리", text, thought:true})), {mode:"first", onComplete:()=>{}});
+      openDialogue(clueData[idx].lines.map(text => ({speaker:"도구리", text, thought:true})), {
+        mode:"first",
+        backgroundDim:false,
+        onComplete:()=>{}
+      });
     }
   }
 
