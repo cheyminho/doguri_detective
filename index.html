@@ -1291,7 +1291,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.81</div>
+    <div id="versionLabel">v0.82</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -3738,11 +3738,13 @@
     saveState();
 
     const message = hintText();
-    showToast(message, TOAST_DURATION_MS, true);
+    // 힌트 안내 토스트는 무음으로 표시한다.
+    showToast(message, TOAST_DURATION_MS, false);
 
     if (state.strangeHatOn) {
       setTimeout(() => {
-        showScoreChangeToast(-1);
+        // 힌트 사용으로 인한 추리력 -1 토스트에서만 효과음을 재생한다.
+        showScoreChangeToast(-1, true);
       }, TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS);
     }
   }
