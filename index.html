@@ -630,7 +630,9 @@
     bottom: -6px;
     min-height: calc(clamp(150px, 23vh, 250px) + clamp(22px, 3vh, 40px) + 24px);
     z-index: 65;
-    background: var(--panel);
+    background: rgba(0,0,0,.55);
+    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: blur(15px);
     border-top: 2px solid var(--line);
     padding: 22px clamp(24px, 5vw, 90px) max(28px, calc(env(safe-area-inset-bottom) + 22px));
   }
@@ -1289,7 +1291,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.79</div>
+    <div id="versionLabel">v0.8</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
