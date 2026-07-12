@@ -1291,7 +1291,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.8</div>
+    <div id="versionLabel">v0.81</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1940,20 +1940,27 @@
 
   function notifyClueAcquiredDelayed(idx, showInvestigationCompleteAfter = false, showScoreChange = state.strangeHatOn) {
     const delay = 250;
-    const scoreToastOffset = showScoreChange ? TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS : 0;
+    const nextToastDelay = TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS;
 
     setTimeout(() => {
-      if (showScoreChange) showScoreChangeToast(3);
+      // 일반 안내 토스트를 먼저 표시하고, 추리력 증감 토스트는 항상 마지막에 표시한다.
+      notifyClueAcquired(idx);
 
-      setTimeout(() => {
-        notifyClueAcquired(idx);
+      if (showInvestigationCompleteAfter) {
+        setTimeout(() => {
+          notifyInvestigationCompleteIfNeeded();
 
-        if (showInvestigationCompleteAfter) {
-          setTimeout(() => {
-            notifyInvestigationCompleteIfNeeded();
-          }, TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS);
-        }
-      }, scoreToastOffset);
+          if (showScoreChange) {
+            setTimeout(() => {
+              showScoreChangeToast(3);
+            }, nextToastDelay);
+          }
+        }, nextToastDelay);
+      } else if (showScoreChange) {
+        setTimeout(() => {
+          showScoreChangeToast(3);
+        }, nextToastDelay);
+      }
     }, delay);
   }
 
@@ -3731,13 +3738,12 @@
     saveState();
 
     const message = hintText();
+    showToast(message, TOAST_DURATION_MS, true);
+
     if (state.strangeHatOn) {
-      showScoreChangeToast(-1);
       setTimeout(() => {
-        showToast(message, TOAST_DURATION_MS, true);
+        showScoreChangeToast(-1);
       }, TOAST_DURATION_MS + TOAST_SEQUENCE_GAP_MS);
-    } else {
-      showToast(message, TOAST_DURATION_MS, true);
     }
   }
 
