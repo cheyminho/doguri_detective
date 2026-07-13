@@ -835,7 +835,8 @@
   .clue-frame {
     display: none;
     background-image: url("images/clues_on.png");
-    background-position: 0% 100%;
+    /* 선택 테두리 리소스: 5×5 시트의 25번째 칸 */
+    background-position: 100% 100%;
     z-index: 2;
     pointer-events: none;
   }
@@ -1322,7 +1323,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v0.98</div>
+    <div id="versionLabel">v1.0</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1514,7 +1515,8 @@
     { name:"자상", keywords:["자상"], lines:["베인 상처라기보다는…","뭔가에 깊이 찔린 상처 같아."], rect:[750,585,894,719] },
     { name:"창문", keywords:["창문"], lines:["창문은 안쪽에서 잠겨 있다.","열쇠 구멍이 있지만 열쇠는 보이지 않는다."], rect:[855,47,1543,390], special:"window" },
     { name:"책", keywords:["청소"], lines:["《매일 10분 정리 습관》, 《먼지 없는 생활》, 《깔끔한 방의 조건》…","청소에 꽤 진심인 분이었나 보다."], rect:[405,363,636,577] },
-    { name:"혹", keywords:["혹"], lines:["혹은 크지만… 이게 정말 치명상이었을까?"], rect:[653,449,746,537] }
+    { name:"혹", keywords:["혹"], lines:["혹은 크지만… 이게 정말 치명상이었을까?"], rect:[653,449,746,537] },
+    { name:"TJ 쿠폰", keywords:["TJ"], lines:["TJ 쿠폰…?"], rect:[85,205,206,286] }
   ];
 
   const rebuttals = [
@@ -1587,8 +1589,8 @@
     version: 4,
     runActive: false,
     completed: false,
-    clues: Array(20).fill(false),
-    hintRevealedClues: Array(20).fill(false),
+    clues: Array(clueData.length).fill(false),
+    hintRevealedClues: Array(clueData.length).fill(false),
     hintUseCount: 0,
     keywords: ["피해자","범인"],
     rebuttalStage: 0,
@@ -1820,10 +1822,11 @@
         Object.keys(base).map(key => [key, Object.prototype.hasOwnProperty.call(parsed, key) ? parsed[key] : base[key]])
       );
       merged.version = base.version;
-      if (!Array.isArray(merged.clues) || merged.clues.length !== 20) merged.clues = Array(20).fill(false);
-      if (!Array.isArray(merged.hintRevealedClues) || merged.hintRevealedClues.length !== 20) {
-        merged.hintRevealedClues = Array(20).fill(false);
-      }
+      // 단서 수가 늘어나도 기존 조사 기록은 유지하고, 새 단서만 미조사 상태로 확장한다.
+      const savedClues = Array.isArray(merged.clues) ? merged.clues : [];
+      const savedHintClues = Array.isArray(merged.hintRevealedClues) ? merged.hintRevealedClues : [];
+      merged.clues = Array.from({length:clueData.length}, (_, idx) => Boolean(savedClues[idx]));
+      merged.hintRevealedClues = Array.from({length:clueData.length}, (_, idx) => Boolean(savedHintClues[idx]));
       merged.hintUseCount = Math.max(0, Number(merged.hintUseCount) || 0);
       if (!Array.isArray(merged.keywords)) merged.keywords = ["피해자","범인"];
       // 정답 빈칸 구조가 바뀐 버전에서는 이전 위치의 임시 배치를 불러오지 않는다.
@@ -1971,7 +1974,7 @@
   }
 
   function notifyInvestigationCompleteIfNeeded() {
-    if (state.clues.filter(Boolean).length !== 20) return;
+    if (state.clues.filter(Boolean).length !== clueData.length) return;
     playSfx("correct");
     showToast("현장 조사 100% 완료!", TOAST_DURATION_MS, false);
   }
@@ -3018,7 +3021,7 @@
   }
 
   function calculateDeductionScore() {
-    const missingClues = 20 - state.clues.filter(Boolean).length;
+    const missingClues = clueData.length - state.clues.filter(Boolean).length;
     const score = 100
       - missingClues * 3
       - state.wrongRebuttalCount * 3
@@ -3198,7 +3201,7 @@
     const translation = $("clearTranslation");
 
     title.textContent = isPerfect ? "완벽한 추리!" : "클리어!";
-    $("clearClueCount").textContent = `단서 수집: ${String(count).padStart(2,"0")} / 20`;
+    $("clearClueCount").textContent = `단서 수집: ${String(count).padStart(2,"0")} / ${clueData.length}`;
     $("clearTime").textContent = `클리어 타임: ${formatClearTime(state.finalTimeMs)}`;
     $("clearScoreValue").textContent = "0";
     $("clearScoreValue").style.color = score >= 90 ? "#f79f92" : "#e2a559";
@@ -3242,7 +3245,7 @@
       });
     }
 
-    if (count === 20 && !state.strangeHatUnlocked) {
+    if (count === clueData.length && !state.strangeHatUnlocked) {
       state.strangeHatUnlocked = true;
       state.strangeHatOn = true;
       pendingStrangeHatAcquireToast = true;
@@ -3507,8 +3510,8 @@
     stopBird();
     state.runActive = false;
     state.completed = false;
-    state.clues = Array(20).fill(false);
-    state.hintRevealedClues = Array(20).fill(false);
+    state.clues = Array(clueData.length).fill(false);
+    state.hintRevealedClues = Array(clueData.length).fill(false);
     state.hintUseCount = 0;
     state.keywords = ["피해자","범인"];
     state.rebuttalStage = 0;
