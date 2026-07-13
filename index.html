@@ -643,34 +643,79 @@
   }
   #dialogueBox {
     --dialogue-edge-gap: clamp(20px, 4vw, 60px);
+    --dialogue-side-padding: clamp(16px, 3vw, 50px);
+    --speaker-name-size: clamp(28px, 3vw, 36px);
+    /* 이름 크기가 커지는 구간과 동일하게 대사 상단 여백도 커지고, 이름이 36px에서 멈추면 여백도 66px에서 멈춘다. */
+    --dialogue-top-padding: clamp(46px, calc(7.5vw - 24px), 66px);
     position: absolute;
     left: var(--dialogue-edge-gap);
     right: var(--dialogue-edge-gap);
     bottom: 30px;
     min-height: calc(clamp(150px, 23vh, 250px) + clamp(22px, 3vh, 40px) + 24px);
     z-index: 65;
-    overflow: hidden;
-    background: rgba(0,0,0,.55);
-    -webkit-backdrop-filter: blur(15px);
-    backdrop-filter: blur(15px);
-    border-radius: clamp(30px, 3vw, 60px);
-    padding: 22px clamp(24px, 5vw, 90px) max(28px, calc(env(safe-area-inset-bottom) + 22px));
+    /* 이름표가 대사창 바깥으로 올라가도 잘리지 않게 한다. */
+    overflow: visible;
+    background: #fffcf1;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-radius: 50px;
+    padding: var(--dialogue-top-padding) var(--dialogue-side-padding) max(28px, calc(env(safe-area-inset-bottom) + 22px));
   }
   #speakerName {
+    --speaker-name-bg: transparent;
     position: relative;
     top: 5px;
-    font-size: clamp(28px, 3vw, 46px);
+    display: table;
+    width: max-content;
+    max-width: 100%;
+    padding: .38em .8em .42em;
+    border-radius: 999px;
+    background: var(--speaker-name-bg);
+    font-size: var(--speaker-name-size);
     font-weight: 800;
-    margin-bottom: 12px;
+    line-height: 1.08;
+    margin-bottom: 18px;
   }
-  #speakerName.doguri { color: var(--doguri); }
-  #speakerName.mung { color: var(--mung); }
-  #speakerName.unknown { color: #929292; }
+  #speakerName.doguri,
+  #speakerName.mung,
+  #speakerName.unknown {
+    position: absolute;
+    left: var(--dialogue-side-padding);
+    top: 0;
+    z-index: 3;
+    /* 이름표 중심을 대사창 상단선에 맞춰 겹친다. */
+    transform: translateY(-35%);
+    max-width: calc(100% - 48px);
+    margin-bottom: 0;
+    color: #fffcf1;
+  }
+  #speakerName.doguri { --speaker-name-bg: #f58682; }
+  #speakerName.mung { --speaker-name-bg: #e2a559; }
+  #speakerName.unknown { --speaker-name-bg: #3f341c; }
+  #speakerName.doguri::after,
+  #speakerName.mung::after,
+  #speakerName.unknown::after {
+    content: "";
+    position: absolute;
+    left: .42em;
+    bottom: -.24em;
+    width: .52em;
+    height: .42em;
+    background: var(--speaker-name-bg);
+    -webkit-clip-path: polygon(0 0, 100% 0, 10% 100%);
+    clip-path: polygon(0 0, 100% 0, 10% 100%);
+  }
   #dialogueText {
-    font-size: clamp(22px, 2.4vw, 38px);
+    position: relative;
+    /* PC: 기존보다 2px 위 */
+	top: 4px;
+	left: 10px;
+    z-index: 1;
+    font-size: clamp(22px, 2.4vw, 30px);
+	font-weight: 520;
     line-height: 1.5;
     min-height: 1.5em;
-    color: #fff;
+    color: #40351c;
   }
   #nextMark {
     position: absolute;
@@ -1265,12 +1310,19 @@
     .clue-cell { border-radius: 0; }
     /* 모바일 대화창: 기존 높이 축소 */
     #dialogueBox {
-	  left: clamp(15px, 3vw, 45px);
-	  right: clamp(15px, 3vw, 45px);
-	  bottom: 24px;
+      --dialogue-side-padding: 22px;
+      --dialogue-top-padding: 42px;
+      left: clamp(15px, 3vw, 45px);
+      right: clamp(15px, 3vw, 45px);
+      bottom: 24px;
 
-      min-height: 200px;
-      padding: 14px 22px max(18px, calc(env(safe-area-inset-bottom) + 12px));
+      min-height: 170px;
+      border-radius: 30px;
+      padding: var(--dialogue-top-padding) var(--dialogue-side-padding) max(18px, calc(env(safe-area-inset-bottom) + 12px));
+    }
+    /* 모바일: PC보다 대사 본문을 조금 아래로 */
+    #dialogueText {
+      top: 8px;
     }
     .character { width: 100vw; height: 100vh; }
     #mungCenter { top: auto; bottom: 88px; }
@@ -1284,7 +1336,7 @@
       max-height: 96dvh;
       padding: 12px;
     }
-    #reasoningText { line-height: 2.3; }
+	#reasoningText { line-height: 2.3; }
   }
 </style>
 </head>
@@ -1323,7 +1375,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v1.2</div>
+    <div id="versionLabel">v1.3</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -2421,6 +2473,7 @@
     const speakerClass = isDoguri ? "doguri" : isUnknown ? "unknown" : "mung";
     $("speakerName").textContent = item.speaker;
     $("speakerName").className = speakerClass;
+    $("dialogueBox").classList.toggle("unknown-speaker", isUnknown);
     $("dialogueText").textContent = item.text;
     $("dialogueText").className = `${item.thought ? "thought " : ""}${speakerClass}`.trim();
     $("nextMark").classList.remove("hidden");
