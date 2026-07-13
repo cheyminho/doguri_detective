@@ -1323,7 +1323,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v1.1</div>
+    <div id="versionLabel">v1.2</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1658,7 +1658,6 @@
   let introAdvanceTimer = null;
   let introShowRaf = null;
   let introTransitionEndHandler = null;
-  let bgmResumeAfterVisibility = false;
   let testModeEnabled = false;
   let testModeScore = 100;
   let newGameConfirmFromSettings = false;
@@ -1723,14 +1722,6 @@
     audio.bgm.src = `bgm/${name}`;
     audio.bgm.currentTime = 0;
     audio.bgm.volume = BGM_VOLUME;
-
-    // 탭이 숨겨졌거나 다른 앱/윈도우로 포커스가 이동했으면 BGM을 시작하지 않는다.
-    if (document.hidden || !document.hasFocus()) {
-      bgmResumeAfterVisibility = true;
-      return;
-    }
-
-    bgmResumeAfterVisibility = false;
     audio.bgm.play().catch(()=>{});
   }
 
@@ -1738,18 +1729,19 @@
     if (currentBgm === name && !audio.bgm.paused) return;
     cancelBgmTransition();
 
-    // 탭이 숨겨졌거나 다른 앱/윈도우로 포커스가 이동했으면 크로스페이드도 재생하지 않는다.
+    // 백그라운드에서는 requestAnimationFrame이 멈출 수 있으므로
+    // 크로스페이드 대신 새 곡으로 즉시 전환해 BGM 재생을 계속한다.
     if (document.hidden || !document.hasFocus()) {
       currentBgm = name;
       audio.bgm.pause();
       audio.bgm.src = `bgm/${name}`;
       audio.bgm.currentTime = 0;
+      audio.bgm.loop = true;
       audio.bgm.volume = BGM_VOLUME;
-      bgmResumeAfterVisibility = true;
+      audio.bgm.play().catch(()=>{});
       return;
     }
 
-    bgmResumeAfterVisibility = false;
     const from = audio.bgm;
     const fromStartVolume = from.paused ? 0 : from.volume;
     const to = new Audio(`bgm/${name}`);
@@ -1785,34 +1777,16 @@
   function stopBgm() {
     cancelBgmTransition();
     audio.bgm.pause();
-    bgmResumeAfterVisibility = false;
     currentBgm = "";
   }
 
-  function pauseBgmForBackground() {
-    const wasPlaying = !audio.bgm.paused || Boolean(outgoingBgm && !outgoingBgm.paused);
-    if (wasPlaying) bgmResumeAfterVisibility = true;
-    cancelBgmTransition();
-    audio.bgm.pause();
-  }
-
-  function resumeBgmFromBackground() {
-    if (document.hidden || !document.hasFocus()) return;
-    if (!bgmResumeAfterVisibility || !currentBgm) return;
-
-    bgmResumeAfterVisibility = false;
-    audio.bgm.volume = BGM_VOLUME;
-    audio.bgm.play().catch(()=>{});
-  }
-
   function handleVisibilityChange() {
-    if (document.hidden) {
-      saveState();
-      pauseBgmForBackground();
-      return;
-    }
+    if (!document.hidden) return;
 
-    resumeBgmFromBackground();
+    saveState();
+    // 백그라운드에서는 화면 갱신이 멈출 수 있으므로 진행 중인 크로스페이드만 마무리한다.
+    // 현재 BGM 자체는 정지하지 않고 계속 재생한다.
+    cancelBgmTransition();
   }
 
   function loadState() {
@@ -4063,10 +4037,9 @@
     gameCursorPressed = false;
     hideGameCursor();
 
-    // 다른 브라우저 탭뿐 아니라 다른 앱/윈도우로 전환해도 BGM을 멈춘다.
-    pauseBgmForBackground();
+    // 포커스를 잃어 화면 갱신이 제한되어도 BGM은 유지하고, 진행 중인 크로스페이드만 마무리한다.
+    cancelBgmTransition();
   });
-  window.addEventListener("focus", resumeBgmFromBackground);
 
   $("titleButton").addEventListener("click", () => { playSfx("confirm"); goTitleFromSettings(); });
   $("settingsNewGameButton").addEventListener("click", () => {
