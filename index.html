@@ -1323,7 +1323,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v1.0</div>
+    <div id="versionLabel">v1.1</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1518,6 +1518,10 @@
     { name:"혹", keywords:["혹"], lines:["혹은 크지만… 이게 정말 치명상이었을까?"], rect:[653,449,746,537] },
     { name:"TJ 쿠폰", keywords:["TJ"], lines:["TJ 쿠폰…?"], rect:[85,205,206,286] }
   ];
+
+  // TJ 쿠폰은 현장에서 조사하고 키워드는 획득하지만, 수첩의 단서 칸과 단서 제시 목록에는 표시하지 않는다.
+  const TJ_CLUE_INDEX = clueData.findIndex(clue => clue.name === "TJ 쿠폰");
+  const isNotebookClue = (_, idx) => idx !== TJ_CLUE_INDEX;
 
   const rebuttals = [
     {
@@ -2511,6 +2515,8 @@
     const grid = $("clueGrid");
     grid.innerHTML = "";
     clueData.forEach((clue, idx) => {
+      if (!isNotebookClue(clue, idx)) return;
+
       const b = document.createElement("button");
       b.className = "clue-cell";
       b.dataset.index = idx;
@@ -2533,6 +2539,17 @@
     });
   }
 
+  function updateClueHintNotice() {
+    const allOtherCluesCollected = clueData.every((_, idx) =>
+      idx === TJ_CLUE_INDEX || state.clues[idx]
+    );
+    const tjClueStillHidden = TJ_CLUE_INDEX >= 0 && !state.clues[TJ_CLUE_INDEX];
+
+    $("clueHintNotice").textContent = allOtherCluesCollected && tjClueStillHidden
+      ? "아직 숨겨진 단서가 하나 더 있습니다."
+      : "힌트 보기를 사용하면 미발견 단서 1개의 이름이 공개됩니다.";
+  }
+
   function openCluePopup(mode) {
     cluePopupMode = mode;
     selectedClue = null;
@@ -2544,6 +2561,7 @@
 
     const keywordWrap = $("clueKeywords");
     const hintNotice = $("clueHintNotice");
+    updateClueHintNotice();
     keywordWrap.classList.toggle("hidden", mode === "present");
     hintNotice.classList.toggle("hidden", mode === "present");
     keywordWrap.innerHTML = "";
@@ -2582,7 +2600,9 @@
   }
 
   function updateClueSelection() {
-    document.querySelectorAll(".clue-cell").forEach((el, i) => el.classList.toggle("selected", i === selectedClue));
+    document.querySelectorAll(".clue-cell").forEach(el => {
+      el.classList.toggle("selected", Number(el.dataset.index) === selectedClue);
+    });
     $("cluePresentButton").disabled = cluePopupMode === "present" && selectedClue === null;
   }
 
@@ -3769,7 +3789,9 @@
 
   function revealOneHiddenClueName() {
     const hiddenMissing = clueData
-      .map((_, idx) => idx)
+      .map((clue, idx) => ({clue, idx}))
+      .filter(({clue, idx}) => isNotebookClue(clue, idx))
+      .map(({idx}) => idx)
       .filter(idx => !state.clues[idx] && !state.hintRevealedClues[idx]);
 
     if (hiddenMissing.length === 0) return null;
