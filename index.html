@@ -631,7 +631,7 @@
     object-fit: contain;
     object-position: center bottom;
   }
-  #mungCenter { left: 50%; transform: translateX(-50%); }
+  #mungCenter { left: 50%; transform: translateX(-50%); bottom: 90px;}
   #doguriLeft { left: max(-2vw); height: min(68vh, 850px); bottom: 135px;}
   #mungRight { right: max(-4vw); height: min(100vh, 1000px); bottom: 30px;}
 
@@ -1375,7 +1375,7 @@
         <option value="0">추리력 0점</option>
       </select>
     </div>
-    <div id="versionLabel">v1.31</div>
+    <div id="versionLabel">v1.32</div>
   </div>
 
   <div id="newGameConfirmDim" class="hidden"></div>
@@ -1733,10 +1733,13 @@
       windowopen:new Audio("sfx/sfx_windowopen.wav"),
       toast:new Audio("sfx/sfx_toast.wav"),
       applause:new Audio("sfx/sfx_applause.wav"),
-      clear100:new Audio("sfx/sfx_clear_100.wav")
+      clear100:new Audio("sfx/sfx_clear_100.wav"),
+      bird:new Audio("sfx/sfx_bird.wav")
     }
   };
   const BGM_VOLUME = .72;
+  // 100점 클리어 화면 오목눈이 효과음 볼륨 (0 = 무음, 1 = 최대)
+  const BIRD_SFX_VOLUME = .3;
   // 모든 토스트 팝업의 노출 시간(ms)
   const TOAST_DURATION_MS = 1500;
   // 연속 토스트 사이의 짧은 간격(ms)
@@ -1748,6 +1751,7 @@
   audio.bgm.loop = true;
   audio.bgm.volume = BGM_VOLUME;
   audio.sfx.applause.volume = .65;
+  audio.sfx.bird.volume = BIRD_SFX_VOLUME;
 
   function playSfx(name) {
     const a = audio.sfx[name];
@@ -3279,10 +3283,13 @@
     }));
 
     if (isPerfect) {
-      // 100점 전용: 오목눈이/말풍선 후 2초 뒤 번역, 다시 1초 뒤 확인 버튼을 노출한다.
-      scheduleClearReveal("clearCommentRow", 5600);
-      scheduleClearReveal("clearTranslation", 7600);
-      scheduleClearReveal("clearActions", 8600, () => {
+      // 100점 전용: 점수 확대 연출이 끝난 뒤 약 1초 쉬고 오목눈이/말풍선을 노출한다.
+      // 이후 2초 뒤 번역, 다시 1초 뒤 확인 버튼을 노출한다.
+      scheduleClearReveal("clearCommentRow", 6600, () => {
+        playSfx("bird");
+      });
+      scheduleClearReveal("clearTranslation", 8600);
+      scheduleClearReveal("clearActions", 9600, () => {
         $("clearConfirm").disabled = false;
       });
     } else {
